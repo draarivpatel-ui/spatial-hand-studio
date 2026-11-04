@@ -21,6 +21,13 @@ const state = {
   benchProgress: 0,
   benchResult: null,
   xrActive: false,
+  webcamActive: false,
+  webcamError: null,
+  radialActive: false,
+  radialIndex: -1,
+  timerRunning: false,
+  timerRemaining: 1500, // 25:00 focus sprint
+  spatialAudio: true,
   fps: 0,
   frameCount: 0,
   lastFpsTime: performance.now(),
@@ -33,24 +40,49 @@ const windows = [
     title: "⌘  Code & Architecture Editor",
     accent: "#38BDF8",
     x: -0.36, y: 0.04, z: -0.32, w: 0.42, h: 0.26, yaw: 0.42,
-    lines: ["› spatial-hand-studio/js/app.js", "›  export function pinchFSM()", "›  1-Euro filter  ·  60fps renderer"],
-    enabled: true, snapProgress: 0
+    lines: [
+      "› spatial-hand-studio/js/app.js",
+      "› export function pinchFSM() {",
+      "›   // hysteresis enter 20mm / exit 28mm",
+      "› }",
+      "› 1-Euro filter  ·  60fps renderer",
+      "› 25 joints per XRHand",
+      "› rested-arm micro-gestures",
+      "› comfort cone 30° from vertical",
+    ],
+    enabled: true, snapProgress: 0, scrollOffset: 0
   },
   {
     id: "node-graph",
     title: "◆  3D Spatial Model & Shader Node Graph",
     accent: "#A855F7",
     x: 0, y: 0.08, z: -0.48, w: 0.44, h: 0.28, yaw: 0,
-    lines: ["[PBR Material] → [Waveguide Shader]", "[Hand Rig] → [Pinch Constraint]", "[Comfort Cone] → [Ergonomic LOD]"],
-    enabled: true, snapProgress: 0
+    lines: [
+      "[PBR Material] -> [Waveguide Shader]",
+      "[Hand Rig] -> [Pinch Constraint]",
+      "[Comfort Cone] -> [Ergonomic LOD]",
+      "[XRFrame] -> [25 Joint Sockets]",
+      "[1-Euro Filter] -> [Stable Ray]",
+      "[Haptic Pulse] -> [Pinch Snap]",
+      "[SPECS HUD] -> [Optical Stack]",
+      "[IWSDK] -> [Scene Manifest]",
+    ],
+    enabled: true, snapProgress: 0, scrollOffset: 0
   },
   {
     id: "sprint-kanban",
-    title: "◉  Sprint Kanban & Voice Notes",
+    title: "◉  Focus Timer & Sprint Voice Notes",
     accent: "#10B981",
     x: 0.38, y: 0.02, z: -0.28, w: 0.40, h: 0.25, yaw: -0.38,
-    lines: ["●  Hand-tracking polish - Done", "●  Comfort cone tuning - In Review", "●  SPECS HUD pass - Todo"],
-    enabled: true, snapProgress: 0
+    lines: [
+      "● Hand-tracking polish - Done",
+      "● Comfort cone tuning - In Review",
+      "● SPECS HUD pass - Todo",
+      "● Web Audio spatial clicks - Done",
+      "● Corner-stretch resize - In Review",
+      "● Radial palette - Todo",
+    ],
+    enabled: true, snapProgress: 0, scrollOffset: 0
   },
 ];
 
