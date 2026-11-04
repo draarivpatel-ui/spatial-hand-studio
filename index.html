@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SpatialHand Studio — 25-Joint WebXR Hand-Tracking Spatial Workspace</title>
-<meta name="description" content="SpatialHand Studio — Award-winning WebXR + 25-Joint Hand-Tracking Spatial Productivity App. Rested-arm ergonomics, curved spatial windows, SPECS AR HUD.">
+<title>SpatialHand Studio - 25-Joint WebXR Hand-Tracking Spatial Workspace</title>
+<meta name="description" content="SpatialHand Studio - Award-winning WebXR + 25-Joint Hand-Tracking Spatial Productivity App. Rested-arm ergonomics, curved spatial windows, SPECS AR HUD.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
@@ -29,7 +29,7 @@
 <!-- Hero + XR entry -->
 <header class="hero">
   <div class="hero-left">
-    <h2>Hands-first spatial productivity — <em>rested-arm ergonomics</em> meets curved WebXR workspaces</h2>
+    <h2>Hands-first spatial productivity - <em>rested-arm ergonomics</em> meets curved WebXR workspaces</h2>
     <p class="hero-sub">
       A zero-build, dependency-free <strong>Immersive Web SDK / WebXR Hand Input</strong> workspace.
       On headset, uses real <code>navigator.xr</code> <code>hand-tracking</code> + <code>local-floor</code>.
@@ -72,29 +72,29 @@
       <div class="kv-grid">
         <div class="kv">
           <div class="kv-label"><b>Thumb-Index Pinch Distance (mm)</b></div>
-          <div id="kv-pinch" class="kv-value">—</div>
+          <div id="kv-pinch" class="kv-value"> - </div>
         </div>
         <div class="kv">
-          <div class="kv-label"><b>Wrist Pitch/Roll (deg)</b><br><span class="kv-sub">Pitch: <b id="kv-pitch-inline">—</b> · Roll: <b id="kv-roll-inline">—</b></span></div>
-          <div id="kv-pitch" class="kv-value violet" style="display:none">—</div>
-          <div id="kv-roll" class="kv-value violet" style="display:none">—</div>
+          <div class="kv-label"><b>Wrist Pitch/Roll (deg)</b><br><span class="kv-sub">Pitch: <b id="kv-pitch-inline"> - </b> · Roll: <b id="kv-roll-inline"> - </b></span></div>
+          <div id="kv-pitch" class="kv-value violet" style="display:none"> - </div>
+          <div id="kv-roll" class="kv-value violet" style="display:none"> - </div>
         </div>
         <div class="kv">
           <div class="kv-label"><b>Ray Stability Jitter Filter (1-Euro Filter Hz)</b></div>
-          <div id="kv-jitter" class="kv-value">—</div>
+          <div id="kv-jitter" class="kv-value"> - </div>
         </div>
         <div class="kv">
-          <div class="kv-label"><b>Shoulder Torque Fatigue Score (N·m)</b><br><span class="kv-sub">Rested: <b id="kv-fatigue-inline">—</b> · Elevated: <b id="kv-fatigue-elevated-inline">—</b></span></div>
-          <div id="kv-fatigue" class="kv-value green" style="display:none">—</div>
-          <div id="kv-fatigue-elevated" class="kv-value amber" style="display:none">—</div>
+          <div class="kv-label"><b>Shoulder Torque Fatigue Score (N·m)</b><br><span class="kv-sub">Rested: <b id="kv-fatigue-inline"> - </b> · Elevated: <b id="kv-fatigue-elevated-inline"> - </b></span></div>
+          <div id="kv-fatigue" class="kv-value green" style="display:none"> - </div>
+          <div id="kv-fatigue-elevated" class="kv-value amber" style="display:none"> - </div>
         </div>
         <div class="kv">
           <div class="kv-label"><b>Torque Reduction</b><br>Rested vs elevated</div>
-          <div id="kv-reduction" class="kv-value green">—</div>
+          <div id="kv-reduction" class="kv-value green"> - </div>
         </div>
         <div class="kv">
           <div class="kv-label"><b>Pinch FSM State</b><br>Hysteresis state machine</div>
-          <div id="kv-state" class="kv-value">—</div>
+          <div id="kv-state" class="kv-value"> - </div>
         </div>
       </div>
 
@@ -123,7 +123,7 @@
       <div class="divider"></div>
       <div class="panel-head" style="padding:0 0 8px;border:none;background:none"><h3>Joint Hierarchy (25 joints)</h3></div>
       <div id="joint-tree" class="joint-tree"></div>
-      <p style="margin-top:8px;font-size:11px;color:var(--text-dim)">Matches exact WebXR <code>XRHand</code> spec — wrist + 5× finger chains.</p>
+      <p style="margin-top:8px;font-size:11px;color:var(--text-dim)">Matches exact WebXR <code>XRHand</code> spec - wrist + 5× finger chains.</p>
     </div>
   </aside>
 
@@ -133,7 +133,7 @@
       <h3>Interactive 3D Spatial Canvas</h3>
       <div class="viewport-actions">
         <span class="pill live">60 fps</span>
-        <span id="kv-fps" class="pill">—</span>
+        <span id="kv-fps" class="pill"> - </span>
         <button id="btn-pinch-toggle" class="btn-ghost" style="font-size:11px">○ Pinch Toggle (Space)</button>
       </div>
     </div>
@@ -156,7 +156,7 @@
     </div>
 
     <div class="stats-bar">
-      <div class="stat"><strong id="stat-fps">—</strong><span>Render FPS</span></div>
+      <div class="stat"><strong id="stat-fps"> - </strong><span>Render FPS</span></div>
       <div class="stat"><strong style="color:var(--cyan)">25</strong><span>Joints / Hand</span></div>
       <div class="stat"><strong style="color:var(--green)">68.4%</strong><span>Torque Reduction</span></div>
     </div>
@@ -195,7 +195,7 @@
       <div style="margin-top:10px">
         <button id="btn-run-bench" class="btn-secondary">▶ Run Ergonomic Fatigue Benchmark (60s Simulation)</button>
         <div class="progress" style="margin-top:10px"><i id="bench-progress-bar" style="width:0%"></i></div>
-        <p id="bench-status" style="margin-top:6px;font-size:11px;color:var(--text-muted)">Idle — tap to simulate 60s session.</p>
+        <p id="bench-status" style="margin-top:6px;font-size:11px;color:var(--text-muted)">Idle - tap to simulate 60s session.</p>
         <div id="bench-result" class="bench-card" style="display:none"></div>
         <p id="bench-reduction" style="display:none"></p>
       </div>
@@ -206,11 +206,11 @@
       <p style="font-size:12px;line-height:1.6;color:var(--text-muted)">
         Gorilla-arm fatigue is the #1 killer of spatial productivity.
         SpatialHand keeps elbows docked on the desk and uses <strong style="color:var(--text)">micro-pinch &amp; wrist-glance</strong>
-        gestures inside a <strong style="color:var(--green)">30° comfort cone</strong> — measured as
+        gestures inside a <strong style="color:var(--green)">30° comfort cone</strong> - measured as
         <strong style="color:var(--text)">68.4% lower deltoid torque</strong> than elevated VR UIs.
       </p>
       <p style="margin-top:8px;font-size:11px;color:var(--text-dim)">
-        68.4% reduction in deltoid torque vs arm-extended VR UI — shoulder moment = r × F · sin(θ). Rested forearm (≈1.1 kg) at ~10° vs full arm (3.5 kg) at 60° abduction.
+        68.4% reduction in deltoid torque vs arm-extended VR UI - shoulder moment = r × F · sin(θ). Rested forearm (≈1.1 kg) at ~10° vs full arm (3.5 kg) at 60° abduction.
       </p>
     </div>
   </aside>

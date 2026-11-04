@@ -1,5 +1,5 @@
 /* =============================================================
-   spatial-renderer.js — 60fps Canvas 3D perspective engine
+   spatial-renderer.js - 60fps Canvas 3D perspective engine
    Curved windows, desk grid, comfort cone, 25-joint hands,
    pinch rays, snap rings, SPECS HUD waveguide frame
    ============================================================= */
@@ -40,7 +40,7 @@ class SpatialRenderer {
 
   // ---------- 3D math ----------
   project(p) {
-    // p in world meters (x,y,z) — y up, z forward
+    // p in world meters (x,y,z) - y up, z forward
     // Apply worldYaw, then camera
     let x = p.x * Math.cos(this.worldYaw) + p.z * Math.sin(this.worldYaw);
     let z = -p.x * Math.sin(this.worldYaw) + p.z * Math.cos(this.worldYaw);

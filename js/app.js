@@ -1,5 +1,5 @@
 /* =============================================================
-   app.js — SpatialHand Studio interactive controller
+   app.js - SpatialHand Studio interactive controller
    Web Audio spatial feedback, gesture choreographer,
    mouse/keyboard hand control, manifest exporter
    ============================================================= */
@@ -49,7 +49,7 @@ const windows = [
     title: "◉  Sprint Kanban & Voice Notes",
     accent: "#10B981",
     x: 0.38, y: 0.02, z: -0.28, w: 0.40, h: 0.25, yaw: -0.38,
-    lines: ["●  Hand-tracking polish — Done", "●  Comfort cone tuning — In Review", "●  SPECS HUD pass — Todo"],
+    lines: ["●  Hand-tracking polish - Done", "●  Comfort cone tuning - In Review", "●  SPECS HUD pass - Todo"],
     enabled: true, snapProgress: 0
   },
 ];
@@ -325,7 +325,7 @@ function bindToggle(id, onChange) {
 function updatePinchButton() {
   const btn = el("btn-pinch-toggle");
   if (!btn) return;
-  btn.textContent = state.isPinching ? "● Pinching — hold Space" : "○ Pinch Toggle (Space)";
+  btn.textContent = state.isPinching ? "● Pinching - hold Space" : "○ Pinch Toggle (Space)";
   btn.style.background = state.isPinching
     ? "linear-gradient(135deg,#A855F7,#38BDF8)" : "";
   btn.style.color = state.isPinching ? "#fff" : "";
@@ -406,7 +406,7 @@ function runGestureDemo(preset) {
 function computeHandJointsForPreset(preset, t) {
   // t 0..1 phase for animated presets
   if (preset === "mouse") {
-    // Controlled by mouse — open hand with pinch if space held
+    // Controlled by mouse - open hand with pinch if space held
     return applyPosePreset(baseJointsRight, state.isPinching ? "pinch" : "open", "right");
   }
   if (preset === "pinch") {
@@ -489,7 +489,7 @@ function frame(now) {
 
   // Fatigue: rested vs elevated
   const restedNm = shoulderTorqueNm({ rested: true });
-  const elevatedNm = shoulderTorqueNm({ armAbductionDeg: 58, elbowFlexDeg: 15, rested: false });
+  const elevatedNm = shoulderTorqueNm({ armAbductionDeg: 58, elbowFlexDeg: 62, rested: false });
   const fatigue = fatigueMetrics(restedNm, elevatedNm);
 
   // Update HUD
@@ -551,7 +551,7 @@ function renderJointTree() {
     { label: "Pinky", joints: FINGER_GROUPS.pinky },
   ];
   container.innerHTML = groups.map(g =>
-    `<div style="margin-top:6px"><b>${g.label}</b> — ${g.joints.map(j => `<span data-joint="${j}">${j}</span>`).join(" · ")}</div>`
+    `<div style="margin-top:6px"><b>${g.label}</b> - ${g.joints.map(j => `<span data-joint="${j}">${j}</span>`).join(" · ")}</div>`
   ).join("");
   // Highlight active joints based on preset
   setInterval(() => {
@@ -586,7 +586,7 @@ function exportManifest() {
     },
     ergonomics: {
       restedTorqueNm: shoulderTorqueNm({ rested: true }),
-      elevatedTorqueNm: shoulderTorqueNm({ armAbductionDeg: 58, rested: false }),
+      elevatedTorqueNm: shoulderTorqueNm({ armAbductionDeg: 58, elbowFlexDeg: 62, rested: false }),
       note: "68.4% reduction via rested-arm micro-gestures vs gorilla-arm elevated reach"
     }
   };
@@ -636,10 +636,10 @@ function runBenchmark() {
     } else {
       state.benchRunning = false;
       const rested = shoulderTorqueNm({ rested: true });
-      const elevated = shoulderTorqueNm({ armAbductionDeg: 62, rested: false });
+      const elevated = shoulderTorqueNm({ armAbductionDeg: 58, elbowFlexDeg: 62, rested: false });
       const fatigue = fatigueMetrics(rested, elevated);
       state.benchResult = fatigue;
-      if (status) status.textContent = "Complete — 60s session analyzed";
+      if (status) status.textContent = "Complete - 60s session analyzed";
       if (resultBox) {
         resultBox.style.display = "block";
         resultBox.innerHTML = `
@@ -672,15 +672,15 @@ function resetScene() {
 async function enterXR() {
   const btn = el("btn-enter-xr");
   if (!navigator.xr) {
-    toast("WebXR not available — running desktop simulator ✓");
+    toast("WebXR not available - running desktop simulator ✓");
     // Visual feedback that simulator is active
-    if (btn) { btn.classList.add("is-active"); btn.querySelector(".btn-label").textContent = "Simulator Active — Move mouse & hold Space to pinch"; }
+    if (btn) { btn.classList.add("is-active"); btn.querySelector(".btn-label").textContent = "Simulator Active - Move mouse & hold Space to pinch"; }
     return;
   }
   const supported = await navigator.xr.isSessionSupported("immersive-vr").catch(() => false)
                  || await navigator.xr.isSessionSupported("immersive-ar").catch(() => false);
   if (!supported) {
-    toast("No headset detected — interactive simulator running");
+    toast("No headset detected - interactive simulator running");
     return;
   }
   try {

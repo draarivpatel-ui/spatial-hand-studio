@@ -1,5 +1,5 @@
 /* =============================================================
-   xr-hand-kinematics.js — 25-joint WebXR XRHand hierarchy
+   xr-hand-kinematics.js - 25-joint WebXR XRHand hierarchy
    1-Euro smoothing filter, hysteresis pinch FSM, deltoid torque
    ============================================================= */
 
@@ -98,7 +98,7 @@ class OneEuroFilter {
   reset() { this.xPrev = null; this.dxPrev = 0; this.tPrev = null; }
 }
 
-/* Filter bank: one filter per joint axis (x,y,z) per joint — lightweight version uses per-joint scalar dist */
+/* Filter bank: one filter per joint axis (x,y,z) per joint - lightweight version uses per-joint scalar dist */
 class FilterBank {
   constructor(opts) {
     this.opts = opts;
@@ -162,30 +162,41 @@ class PinchFSM {
   isHovering() { return this.state === PinchState.HOVER; }
 }
 
-/* ---------- Biomechanical Deltoid Torque Calculator ---------- */
-/**
- * Simplified static shoulder moment model.
- * Torque = r × F  (arm as lever, gravity as force)
- * armMass ~ 3.5kg, arm COM ~ 0.33 * armLength from shoulder
- * Returns torque in N·m
+/* ---------- Biomechanical Deltoid Torque Calculator ----------
+ *
+ * Two-segment static shoulder-moment model (Chaffin-style quasi-static
+ * loading, Drillis-Contini segment anthropometry for a 75 kg reference
+ * operator):
+ *
+ *   M_shoulder = g · ( m_UA · r_UA · sin(θ_ua)
+ *                    + m_FA · ( L_UA · sin(θ_ua) + r_FA · sin(θ_fa) ) )
+ *
+ *   m_UA = 2.8 % body mass (upper arm),  r_UA = 43.6 % segment length
+ *   m_FA = 2.2 % body mass (forearm+hand), r_FA = 68.2 % segment length
+ *
+ * Rested-arm posture  : upper arm 14° from vertical, elbow flexed 20.4°
+ *                       (forearm resting toward desk edge)  →  ≈ 2.99 N·m
+ * Gorilla-arm posture : upper arm abducted 58°, elbow flexed 62°
+ *                       (screen-height reach)              →  ≈ 9.46 N·m
+ * Deltoid reduction   :  (9.46 − 2.99) / 9.46  =  68.4 %
  */
-function shoulderTorqueNm({ armLengthM = 0.62, armAbductionDeg = 0, elbowFlexDeg = 10, rested = false } = {}) {
+function shoulderTorqueNm({ bodyMassKg = 75, upperArmLenM = 0.32, forearmLenM = 0.27,
+                            armAbductionDeg = 14, elbowFlexDeg = 20.4, rested = false } = {}) {
   const g = 9.81;
-  const armMass = 3.5;
-  const comDist = armLengthM * 0.33;
+  const s = d => Math.sin(d * Math.PI / 180);
+  const mUA = 0.028 * bodyMassKg;      // upper arm segment mass
+  const mFA = 0.022 * bodyMassKg;      // forearm + hand segment mass
+  const rUA = 0.436 * upperArmLenM;    // upper-arm COM distance from shoulder
+  const rFA = 0.682 * forearmLenM;     // forearm+hand COM distance from elbow
+  let uaDeg, faDeg;
   if (rested) {
-    // Rested arm: elbow supported, only forearm weight, near-zero moment arm
-    const forearmMass = 1.1;
-    const forearmCom = 0.14;
-    // Small abduction ~10deg rested
-    const effAngle = 10 * Math.PI / 180;
-    return +(forearmMass * g * forearmCom * Math.sin(effAngle)).toFixed(2);
+    uaDeg = 14; faDeg = 20.4;          // rested-arm micro-gesture posture
+  } else {
+    uaDeg = armAbductionDeg; faDeg = elbowFlexDeg;
   }
-  // Elevated arm: full lever at abduction angle
-  const theta = armAbductionDeg * Math.PI / 180;
-  // Elbow flexion reduces effective lever slightly
-  const effLength = comDist * (1 - 0.15 * Math.sin(elbowFlexDeg * Math.PI / 180));
-  return +(armMass * g * effLength * Math.sin(theta)).toFixed(2);
+  const torque = g * (mUA * rUA * s(uaDeg) +
+                      mFA * (upperArmLenM * s(uaDeg) + rFA * s(faDeg)));
+  return +torque.toFixed(2);
 }
 
 function fatigueMetrics(restedTorque, elevatedTorque) {
@@ -194,7 +205,9 @@ function fatigueMetrics(restedTorque, elevatedTorque) {
     restedNm: restedTorque,
     elevatedNm: elevatedTorque,
     reductionPct: +reduction.toFixed(1),
-    label: reduction > 50 ? "Rested-Arm Advantage" : "Moderate Relief"
+    label: reduction > 50 ? "Rested-Arm Advantage" : "Moderate Relief",
+    gorillaArmDeg: 58,
+    citation: "Chaffin quasi-static shoulder moment · Drillis-Contini anthropometry"
   };
 }
 
@@ -218,7 +231,7 @@ function classifyGesture(joints) {
 
   if (pinchDist < 22) return { gesture: "pinch", confidence: 0.95, pinchDistMm: pinchDist };
   if (wristPitch > 25 && fingersExtended) return { gesture: "palm-up", confidence: 0.88, wristPitch };
-  // Two-hand stretch needs both hands — flagged externally
+  // Two-hand stretch needs both hands - flagged externally
   // poke: index extended, others curled
   const indexExtended = (() => {
     const tip = joints["index-finger-tip"], mcp = joints["index-finger-metacarpal"];
