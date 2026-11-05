@@ -515,7 +515,7 @@ const RADIAL_ACTIONS = [
 ];
 
 /* Two-hand corner stretch: grab opposite corners of the focused window and
-   pull apart — window scales along the curved cylinder, clamped to safe
+   pull apart  -  window scales along the curved cylinder, clamped to safe
    ergonomic bounds. Uses live hand separation as the scale driver. */
 function applyTwoHandStretch(separationM) {
   if (!Number.isFinite(separationM) || separationM < 0) return null;
@@ -759,7 +759,9 @@ function exportManifest() {
   ensureAudio(); SFX.click();
   const manifest = {
     app: "SpatialHand Studio",
-    version: "1.0.0",
+    version: "1.1.0",
+    format: "spatial-hand-scene-v1",
+    sdkImportVerified: false,
     createdAt: new Date().toISOString(),
     xr: { handTracking: true, requiredFeatures: ["hand-tracking", "local-floor"], referenceSpace: "local-floor" },
     viewMode: state.viewMode,
@@ -779,7 +781,7 @@ function exportManifest() {
     ergonomics: {
       restedTorqueNm: shoulderTorqueNm({ rested: true }),
       elevatedTorqueNm: shoulderTorqueNm({ armAbductionDeg: 58, elbowFlexDeg: 62, rested: false }),
-      note: "68.4% reduction via rested-arm micro-gestures vs gorilla-arm elevated reach"
+      note: "Illustrative quasi-static posture model only; no measured human fatigue or clinical outcome"
     }
   };
   const pretty = JSON.stringify(manifest, null, 2);
