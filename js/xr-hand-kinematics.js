@@ -63,6 +63,8 @@ function buildBaseHandJoints(handedness) {
 /* ---------- 1-Euro Filter (Casiez et al.) ---------- */
 class OneEuroFilter {
   constructor({ freq = 60, minCutoff = 1.0, beta = 0.007, dCutoff = 1.0 } = {}) {
+    if (![freq, minCutoff, dCutoff].every(v => Number.isFinite(v) && v > 0) ||
+        !Number.isFinite(beta) || beta < 0) throw new RangeError("Invalid filter parameters");
     this.freq = freq;
     this.minCutoff = minCutoff;
     this.beta = beta;
@@ -76,6 +78,8 @@ class OneEuroFilter {
     return 1 / (1 + tau / dt);
   }
   filter(value, timestamp) {
+    if (!Number.isFinite(value) || !Number.isFinite(timestamp)) return this.xPrev ?? NaN;
+    if (this.tPrev !== null && timestamp <= this.tPrev) return this.xPrev;
     if (this.tPrev === null) {
       this.tPrev = timestamp;
       this.xPrev = value;
@@ -126,13 +130,25 @@ class PinchFSM {
     this.exitMm = exitThresholdMm;
     this.state = PinchState.IDLE;
     this.listeners = [];
+    this.setThresholds(enterThresholdMm, exitThresholdMm);
   }
-  setThresholds(enter, exit) { this.enterMm = enter; this.exitMm = exit; }
+  setThresholds(enter, exit) {
+    if (!Number.isFinite(enter) || !Number.isFinite(exit) || enter <= 0 || exit <= enter)
+      throw new RangeError("Pinch exit threshold must exceed a positive enter threshold");
+    this.enterMm = enter; this.exitMm = exit;
+  }
+  reset() {
+    const previous = this.state;
+    this.state = PinchState.IDLE;
+    if (previous !== this.state) this._emit(previous, this.state);
+    return this.state;
+  }
   onTransition(cb) { this.listeners.push(cb); }
   _emit(from, to) { for (const cb of this.listeners) cb(from, to); }
 
   /** distanceMm = thumbTip to indexTip distance in mm */
   update(distanceMm) {
+    if (!Number.isFinite(distanceMm) || distanceMm < 0) return this.reset();
     const prev = this.state;
     switch (this.state) {
       case PinchState.IDLE:
@@ -144,7 +160,7 @@ class PinchFSM {
         break;
       case PinchState.PINCH_START:
         // One-frame confirmation then dragging
-        this.state = PinchState.DRAGGING;
+        this.state = distanceMm > this.exitMm ? PinchState.RELEASE : PinchState.DRAGGING;
         break;
       case PinchState.DRAGGING:
         if (distanceMm > this.exitMm) { this.state = PinchState.RELEASE; }

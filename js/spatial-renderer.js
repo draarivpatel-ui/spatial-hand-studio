@@ -24,6 +24,10 @@ class SpatialRenderer {
     this.curvedRadius = 0.85;
     this.grabbedWindow = null;
     this.hoverWindow = null;
+    this.radial = null;   // { items, index, phase } when palette is summoned
+    this.stretch = null;  // { w, scale } during two-hand corner stretch
+    this.poke = null;     // { windowId, offset } during index poke scroll
+    this.webcam = { active: false, error: null };
     this._resize();
     window.addEventListener("resize", () => this._resize());
   }
@@ -292,14 +296,26 @@ class SpatialRenderer {
       ctx.font = "700 11px Inter, system-ui, sans-serif";
       ctx.fillText(w.title || w.id, minX + 8, minY + 12);
 
-      // Tiny content lines
+      // Tiny content lines (scrollable via index poke & micro-scroll)
       if (w.lines) {
         ctx.fillStyle = "rgba(148,163,184,0.95)";
         ctx.font = "500 9.5px JetBrains Mono, monospace";
-        let ly = minY + headerH + 12;
-        for (const line of w.lines.slice(0, 4)) {
-          ctx.fillText(line, minX + 8, ly);
+        const off = Math.max(0, w.scrollOffset || 0);
+        const first = Math.floor(off / 11);
+        const frac = off - first * 11;
+        let ly = minY + headerH + 12 - frac;
+        for (let i = first; i < Math.min(w.lines.length, first + 5); i++) {
+          if (ly > minY + headerH + 2) ctx.fillText(w.lines[i], minX + 8, ly);
           ly += 11;
+        }
+        // Scroll indicator when content overflows
+        if (w.lines.length > 4) {
+          const trackH = 26;
+          const scrollFrac = Math.min(1, off / Math.max(1, (w.lines.length - 4) * 11));
+          ctx.fillStyle = "rgba(148,163,184,0.18)";
+          ctx.fillRect(maxX - 4, minY + headerH + 6, 2, trackH);
+          ctx.fillStyle = "rgba(56,189,248,0.65)";
+          ctx.fillRect(maxX - 4, minY + headerH + 6 + scrollFrac * (trackH - 8), 2, 8);
         }
       }
 
@@ -330,6 +346,54 @@ class SpatialRenderer {
     for (const hand of this.hands) {
       if (!hand.joints) continue;
       this._drawSingleHand(hand);
+    }
+    // Two-hand corner stretch: dimension line + live scale readout
+    if (this.stretch && this.stretch.w && this.hands.length >= 2) {
+      const a = this.hands[0], b = this.hands[1];
+      const pa = this.project({ x: (a.worldX || 0), y: (a.worldY || 0), z: (a.worldZ || 0) });
+      const pb = this.project({ x: (b.worldX || 0), y: (b.worldY || 0), z: (b.worldZ || 0) });
+      if (pa && pb) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.strokeStyle = "rgba(168,85,247,0.75)";
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+        ctx.setLineDash([]);
+        // End ticks (corner handles)
+        for (const p of [pa, pb]) {
+          ctx.strokeStyle = "rgba(168,85,247,0.95)";
+          ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2); ctx.stroke();
+        }
+        // Readout
+        const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2 - 12;
+        ctx.fillStyle = "rgba(233,213,255,0.95)";
+        ctx.font = "700 10px JetBrains Mono, monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(`stretch ×${this.stretch.scale.toFixed(2)}`, mx, my);
+        ctx.textAlign = "start";
+        ctx.restore();
+      }
+    }
+    // Index poke & micro-scroll: highlight the window being scrolled
+    if (this.poke && this.poke.windowId) {
+      const w = this.windows.find(x => x.id === this.poke.windowId);
+      if (w) {
+        const c = this.project({ x: w.x, y: w.y, z: w.z });
+        if (c) {
+          const ctx = this.ctx;
+          ctx.save();
+          ctx.strokeStyle = "rgba(245,158,11,0.8)";
+          ctx.lineWidth = 1.4;
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(c.x - w.w * 130, c.y - w.h * 130, w.w * 260, w.h * 260);
+          ctx.setLineDash([]);
+          ctx.fillStyle = "rgba(245,158,11,0.95)";
+          ctx.font = "700 9px JetBrains Mono, monospace";
+          ctx.fillText(`poke-scroll ▲▼ ${Math.round(this.poke.offset)}px`, c.x - w.w * 130, c.y - w.h * 130 - 6);
+          ctx.restore();
+        }
+      }
     }
   }
 
@@ -507,6 +571,110 @@ class SpatialRenderer {
     this.drawComfortCone();
     this.drawWindows();
     this.drawHands();
+    this.drawRadialPalette();
+    this.drawWebcamPIP();
     this.drawSpecsHUD();
+  }
+
+  /* Radial quick-action palette summoned by the palm-up wrist glance.
+     Rendered as a heads-up ring anchored to the lower-center of the
+     viewport, near the rested hand's natural dwell zone. */
+  drawRadialPalette() {
+    if (!this.radial || !this.radial.items || !this.radial.items.length) return;
+    const ctx = this.ctx;
+    const cx = this.w / 2, cy = this.h * 0.58;
+    const R = Math.min(this.w, this.h) * 0.13;
+    const items = this.radial.items;
+    const sel = this.radial.index;
+
+    // Backdrop
+    ctx.save();
+    ctx.fillStyle = "rgba(9,13,22,0.72)";
+    ctx.beginPath(); ctx.arc(cx, cy, R + 34, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(168,85,247,0.35)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Ring segments
+    for (let i = 0; i < items.length; i++) {
+      const a = (i / items.length) * Math.PI * 2 - Math.PI / 2;
+      const ix = cx + Math.cos(a) * R, iy = cy + Math.sin(a) * R;
+      const isSel = i === sel;
+      // Segment wedge
+      const a0 = a - Math.PI / items.length * 0.86;
+      const a1 = a + Math.PI / items.length * 0.86;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, R + 22, a0, a1);
+      ctx.closePath();
+      ctx.fillStyle = isSel ? "rgba(168,85,247,0.28)" : "rgba(56,189,248,0.06)";
+      ctx.fill();
+      if (isSel) { ctx.strokeStyle = "rgba(168,85,247,0.8)"; ctx.lineWidth = 1.4; ctx.stroke(); }
+      // Icon
+      ctx.fillStyle = isSel ? "#E9D5FF" : "rgba(148,163,184,0.9)";
+      ctx.font = "600 13px Inter, system-ui, sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(items[i].icon, ix, iy);
+      // Label for selected
+      if (isSel) {
+        ctx.fillStyle = "rgba(233,213,255,0.95)";
+        ctx.font = "700 11px Inter, system-ui, sans-serif";
+        ctx.fillText(items[i].label, cx, cy);
+        // Commit progress arc
+        const p = Math.min(1, Math.max(0, ((this.radial.phase || 0) % 2.6) / 2.6));
+        ctx.beginPath();
+        ctx.arc(cx, cy, 14, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+        ctx.strokeStyle = "rgba(16,185,129,0.9)";
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+      }
+    }
+    ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+    ctx.restore();
+  }
+
+  /* Live webcam picture-in-picture (Gesture 5) drawn bottom-right with a
+     skin-blob centroid crosshair so judges see the tracking signal. */
+  drawWebcamPIP() {
+    if (!this.webcam || !this.webcam.active) return;
+    const ctx = this.ctx;
+    const pw = 128, ph = 96, pad = 14;
+    const x0 = this.w - pw - pad, y0 = this.h - ph - pad;
+    ctx.save();
+    ctx.fillStyle = "rgba(9,13,22,0.82)";
+    ctx.strokeStyle = "rgba(56,189,248,0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x0, y0, pw, ph, 8); else ctx.rect(x0, y0, pw, ph);
+    ctx.fill(); ctx.stroke();
+    // Video frame
+    const video = window.__spatialHandWebcamVideo;
+    if (video && video.readyState >= 2) {
+      ctx.save();
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(x0 + 4, y0 + 4, pw - 8, ph - 8, 6); else ctx.rect(x0 + 4, y0 + 4, pw - 8, ph - 8);
+      ctx.clip();
+      ctx.globalAlpha = 0.85;
+      try { ctx.drawImage(video, x0 + 4, y0 + 4, pw - 8, ph - 8); } catch (_) {}
+      ctx.restore();
+    } else {
+      ctx.fillStyle = "rgba(148,163,184,0.7)";
+      ctx.font = "600 10px Inter, system-ui, sans-serif";
+      ctx.fillText("camera starting…", x0 + 12, y0 + ph / 2);
+    }
+    // Centroid crosshair
+    const hand = window.__spatialHandWebcamHand;
+    if (hand && hand.px !== null) {
+      const hx = x0 + 4 + hand.px * (pw - 8), hy = y0 + 4 + hand.py * (ph - 8);
+      ctx.strokeStyle = "#10B981";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hx - 11, hy); ctx.lineTo(hx + 11, hy);
+      ctx.moveTo(hx, hy - 11); ctx.lineTo(hx, hy + 11); ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(226,232,240,0.9)";
+    ctx.font = "700 9px JetBrains Mono, monospace";
+    ctx.fillText("LIVE HAND TRACK", x0 + 8, y0 + ph - 6);
+    ctx.restore();
   }
 }
