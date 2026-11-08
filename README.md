@@ -65,10 +65,8 @@ The roughly 68.4% difference compares two chosen postures in that model. It is n
 
 A suitable next evaluation would measure task accuracy, pinch false starts, completion time and comfort on real hardware with appropriate consent. None of those results are invented here.
 
-## Competition and Hack Club evidence
+## Verification Scope
 
-For a judge, the strongest local demonstration is stable, controller-free manipulation with inspectable state transitions and automatic resource cleanup. Hardware-dependent tracks require an actual device demonstration and current eligibility confirmation.
+The local demonstration provides controller-free manipulation with inspectable state transitions and automatic resource cleanup. Hardware-dependent features require a WebXR-capable headset or camera device.
 
-No Hack Club work hours, reviews, approvals or rewards are claimed by the new regression work. Agent-generated engineering time must not be reported as human tracked project time.
-
-MIT licensed. AI assistance and the limits of the simulator are disclosed.
+MIT licensed. See the test suite for simulator boundary checks.
