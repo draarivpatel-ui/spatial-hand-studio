@@ -144,7 +144,6 @@ const SFX = {
   hover(pan = 0) { playTone({ freq: 1200, duration: 0.06, gain: 0.07, type: "sine", pan }); },
   snap(pan = 0) { playTone({ freq: 880, duration: 0.18, gain: 0.15, type: "sine", sweepTo: 1320, pan }); setTimeout(() => playTone({ freq: 1320, duration: 0.12, gain: 0.10, pan }), 90); },
   click(pan = 0) { playTone({ freq: 900, duration: 0.05, gain: 0.11, type: "sine", pan }); },
-  radialTick(i = 0) { playTone({ freq: 780 + i * 90, duration: 0.05, gain: 0.10, type: "sine", pan: Math.sin(i / 6 * Math.PI * 2) * 0.8 }); },
   radialCommit(i = 0) { playTone({ freq: 980 + i * 120, duration: 0.16, gain: 0.15, type: "sine", sweepTo: 1400, pan: Math.sin(i / 6 * Math.PI * 2) * 0.8 }); },
   timerTick(pan = 0) { playTone({ freq: 1600, duration: 0.03, gain: 0.05, type: "sine", pan }); },
   timerDone() { playTone({ freq: 1046, duration: 0.35, gain: 0.16, type: "sine", pan: -0.5 }); setTimeout(() => playTone({ freq: 1318, duration: 0.35, gain: 0.16, type: "sine", pan: 0.5 }), 180); setTimeout(() => playTone({ freq: 1568, duration: 0.5, gain: 0.14, type: "sine", pan: 0 }), 360); },
@@ -156,7 +155,6 @@ const SFX = {
 let renderer, animId;
 let baseJointsRight, baseJointsLeft;
 let pinchFSM, filterBank;
-let currentHands = [];
 let demoTimer = null;
 let suppressHoverSfxUntil = 0;
 
@@ -550,7 +548,6 @@ function toggleSpatialAudio() {
 
 function frame(now) {
   animId = requestAnimationFrame(frame);
-  const tSec = now / 1000;
 
   // FPS
   state.frameCount++;
