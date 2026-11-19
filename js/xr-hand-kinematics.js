@@ -13,16 +13,6 @@ const XR_JOINT_ORDER = [
   "pinky-finger-metacarpal","pinky-finger-phalanx-proximal","pinky-finger-phalanx-intermediate","pinky-finger-phalanx-distal","pinky-finger-tip"
 ];
 
-// Parent index for each joint (null = root)
-const XR_JOINT_PARENTS = {
-  "wrist": null,
-  "thumb-metacarpal":"wrist","thumb-phalanx-proximal":"thumb-metacarpal","thumb-phalanx-distal":"thumb-phalanx-proximal","thumb-tip":"thumb-phalanx-distal",
-  "index-finger-metacarpal":"wrist","index-finger-phalanx-proximal":"index-finger-metacarpal","index-finger-phalanx-intermediate":"index-finger-phalanx-proximal","index-finger-phalanx-distal":"index-finger-phalanx-intermediate","index-finger-tip":"index-finger-phalanx-distal",
-  "middle-finger-metacarpal":"wrist","middle-finger-phalanx-proximal":"middle-finger-metacarpal","middle-finger-phalanx-intermediate":"middle-finger-phalanx-proximal","middle-finger-phalanx-distal":"middle-finger-phalanx-intermediate","middle-finger-tip":"middle-finger-phalanx-distal",
-  "ring-finger-metacarpal":"wrist","ring-finger-phalanx-proximal":"ring-finger-metacarpal","ring-finger-phalanx-intermediate":"ring-finger-phalanx-proximal","ring-finger-phalanx-distal":"ring-finger-phalanx-intermediate","ring-finger-tip":"ring-finger-phalanx-distal",
-  "pinky-finger-metacarpal":"wrist","pinky-finger-phalanx-proximal":"pinky-finger-metacarpal","pinky-finger-phalanx-intermediate":"pinky-finger-phalanx-proximal","pinky-finger-phalanx-distal":"pinky-finger-phalanx-intermediate","pinky-finger-tip":"pinky-finger-phalanx-distal"
-};
-
 const FINGER_GROUPS = {
   thumb: ["thumb-metacarpal","thumb-phalanx-proximal","thumb-phalanx-distal","thumb-tip"],
   index: ["index-finger-metacarpal","index-finger-phalanx-proximal","index-finger-phalanx-intermediate","index-finger-phalanx-distal","index-finger-tip"],
@@ -175,7 +165,6 @@ class PinchFSM {
     return this.state;
   }
   isPinching() { return this.state === PinchState.PINCH_START || this.state === PinchState.DRAGGING; }
-  isHovering() { return this.state === PinchState.HOVER; }
 }
 
 /* ---------- Biomechanical Deltoid Torque Calculator ----------
@@ -225,36 +214,6 @@ function fatigueMetrics(restedTorque, elevatedTorque) {
     gorillaArmDeg: 58,
     citation: "Chaffin quasi-static shoulder moment · Drillis-Contini anthropometry"
   };
-}
-
-/* ---------- Gesture Classifier (lightweight) ---------- */
-function classifyGesture(joints) {
-  // joints: map jointName -> {x,y,z}
-  const thumbTip = joints["thumb-tip"];
-  const indexTip = joints["index-finger-tip"];
-  const middleTip = joints["middle-finger-tip"];
-  const wrist = joints["wrist"];
-  if (!thumbTip || !indexTip || !wrist) return { gesture: "unknown", confidence: 0 };
-  const pinchDist = distMm(thumbTip, indexTip);
-  const wristPitch = Math.atan2(wrist.y || 0, 0.1) * 180 / Math.PI;
-
-  // Palm-up detection: wrist pitch > 25 && fingers roughly extended
-  const fingersExtended = ["index","middle","ring","pinky"].every(f => {
-    const tip = joints[FINGER_GROUPS[f][4]];
-    const mcp = joints[FINGER_GROUPS[f][0]];
-    return tip && mcp && (tip.z - mcp.z) > 0.04;
-  });
-
-  if (pinchDist < 22) return { gesture: "pinch", confidence: 0.95, pinchDistMm: pinchDist };
-  if (wristPitch > 25 && fingersExtended) return { gesture: "palm-up", confidence: 0.88, wristPitch };
-  // Two-hand stretch needs both hands - flagged externally
-  // poke: index extended, others curled
-  const indexExtended = (() => {
-    const tip = joints["index-finger-tip"], mcp = joints["index-finger-metacarpal"];
-    return tip && mcp && (tip.z - mcp.z) > 0.05;
-  })();
-  if (indexExtended && pinchDist > 40) return { gesture: "poke", confidence: 0.82 };
-  return { gesture: "open-palm", confidence: 0.75, pinchDistMm: pinchDist };
 }
 
 function distMm(a, b) {

@@ -40,8 +40,6 @@ class SpatialRenderer {
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
-  setWorldYaw(v) { this.worldYaw = v; }
-
   // ---------- 3D math ----------
   project(p) {
     // p in world meters (x,y,z) - y up, z forward
@@ -137,8 +135,6 @@ class SpatialRenderer {
       const b = this.project({ x: size / 2, y: gridY, z });
       this._line(a, b, "rgba(148,163,184,0.09)", 1);
     }
-    // Center cross
-    const cx1 = this.project({ x: 0, y: gridY, z: 0 }); // not used
     ctx.restore();
   }
 
@@ -281,8 +277,6 @@ class SpatialRenderer {
       ctx.closePath();
       ctx.clip();
 
-      // Compute header quad (top edge inset)
-      const topEdgeLen = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
       // Simple: draw header as filled rect across top
       ctx.fillStyle = isGrabbed ? "rgba(56,189,248,0.22)" : "rgba(255,255,255,0.06)";
       // Use a horizontal band
