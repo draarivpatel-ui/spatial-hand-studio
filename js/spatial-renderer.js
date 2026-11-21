@@ -1,7 +1,7 @@
 /* =============================================================
-   spatial-renderer.js - 60fps Canvas 3D perspective engine
-   Curved windows, desk grid, comfort cone, 25-joint hands,
-   pinch rays, snap rings, SPECS HUD waveguide frame
+   spatial-renderer.js - Canvas 2D perspective drawing layer.
+   Desk grid, curved guides, comfort cone, 25-joint hands, index
+   rays, snap rings and HUD overlay. No WebGL context is created.
    ============================================================= */
 
 class SpatialRenderer {
@@ -19,8 +19,9 @@ class SpatialRenderer {
     // Scene state (bound externally)
     this.windows = [];
     this.hands = []; // { handedness, joints, pinchState, pinchPoint }
-    this.viewMode = "quest"; // quest | specs | cone
-    this.comfortCone = { enabled: true, angleDeg: 30, radiusM: 0.45 };
+    this.viewMode = "passthrough"; // passthrough | hud | cone
+    this.comfortCone = { enabled: true, angleDeg: 30, radiusM: 0.45, apex: { x: 0, y: -0.28, z: 0.18 } };
+    this.modelSummary = null; // { reductionPct } set by the controller
     this.curvedRadius = 0.85;
     this.grabbedWindow = null;
     this.hoverWindow = null;
@@ -34,51 +35,73 @@ class SpatialRenderer {
 
   _resize() {
     const rect = this.canvas.getBoundingClientRect();
-    this.w = rect.width; this.h = rect.height;
-    this.canvas.width = this.w * this.dpr;
-    this.canvas.height = this.h * this.dpr;
+    this.w = Math.max(1, rect.width || this.canvas.clientWidth || 800);
+    this.h = Math.max(1, rect.height || this.canvas.clientHeight || 500);
+    this.canvas.width = Math.round(this.w * this.dpr);
+    this.canvas.height = Math.round(this.h * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
   setWorldYaw(v) { this.worldYaw = v; }
 
   // ---------- 3D math ----------
+  /* World metres: +Y up. A worldYaw rotation is applied about the origin,
+     then the point is expressed in a camera basis derived from camYaw and
+     camPitch, and finally divided by its camera-space depth. */
   project(p) {
-    // p in world meters (x,y,z) - y up, z forward
-    // Apply worldYaw, then camera
-    let x = p.x * Math.cos(this.worldYaw) + p.z * Math.sin(this.worldYaw);
-    let z = -p.x * Math.sin(this.worldYaw) + p.z * Math.cos(this.worldYaw);
-    let y = p.y;
+    if (!p || ![p.x, p.y, p.z].every(Number.isFinite)) return null;
+    const cosW = Math.cos(this.worldYaw), sinW = Math.sin(this.worldYaw);
+    const x = p.x * cosW + p.z * sinW;
+    const z = -p.x * sinW + p.z * cosW;
+    const y = p.y - 0.02;
 
-    // Camera orbit
-    const cx = Math.sin(this.camYaw) * this.camDist;
-    const cz = Math.cos(this.camYaw) * this.camDist;
-    const cy = Math.sin(this.camPitch) * this.camDist;
-    // Simple perspective: translate to camera, then project
-    // Camera at (cx, cy, cz) looking at origin
-    // For simplicity use pinhole centered on canvas
-    x -= 0; y -= 0.02; z -= 0.35;
+    const yaw = this.camYaw, pitch = this.camPitch;
+    const right = { x: Math.cos(yaw), y: 0, z: -Math.sin(yaw) };
+    const up = { x: -Math.sin(yaw) * Math.sin(pitch), y: Math.cos(pitch), z: -Math.cos(yaw) * Math.sin(pitch) };
+    const back = { x: Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: Math.cos(yaw) * Math.cos(pitch) };
 
-    // Rotate by -camYaw around Y, -camPitch around X
-    const cosY = Math.cos(-this.camYaw), sinY = Math.sin(-this.camYaw);
-    let rx = x * cosY - z * sinY;
-    let rz = x * sinY + z * cosY;
-    const cosP = Math.cos(-this.camPitch), sinP = Math.sin(-this.camPitch);
-    let ry = y * cosP - rz * sinP;
-    rz = y * sinP + rz * cosP;
+    const vx = x, vy = y, vz = z - 0.35;
+    const rx = vx * right.x + vy * right.y + vz * right.z;
+    const ry = vx * up.x + vy * up.y + vz * up.z;
+    const rz = vx * back.x + vy * back.y + vz * back.z;
 
-    // Perspective
-    const focal = 520; // px
-    const camZ = 1.45;
-    const depth = rz + camZ;
+    const focal = 520;
+    const depth = this.camDist + rz;
     if (depth <= 0.06) return null;
     const s = focal / depth;
+    return { x: this.w / 2 + rx * s, y: this.h / 2 - ry * s, s, depth, world: p };
+  }
+
+  windowQuad(w) {
+    if (!w || ![w.x, w.y, w.z, w.w, w.h].every(Number.isFinite) || w.w <= 0 || w.h <= 0) return null;
+    const yaw = Number.isFinite(w.yaw) ? w.yaw : 0;
+    const c = Math.cos(yaw), q = Math.sin(yaw);
+    const corners = [[-1, 1], [1, 1], [1, -1], [-1, -1]].map(([x, y]) => {
+      const offset = x * w.w / 2;
+      /* Same yaw convention as handJointWorld: local +X swings toward -Z. */
+      return this.project({ x: w.x + offset * c, y: w.y + y * w.h / 2, z: w.z - offset * q });
+    });
+    return corners.every(Boolean) ? corners : null;
+  }
+
+  handJointWorld(hand, position) {
+    if (!hand || !position || ![position.x, position.y, position.z].every(Number.isFinite)) return null;
+    if (hand.jointsAreWorld) return { ...position };
+    const yaw = Number.isFinite(hand.yaw) ? hand.yaw : 0;
+    const c = Math.cos(yaw), q = Math.sin(yaw);
     return {
-      x: this.w / 2 + rx * s,
-      y: this.h / 2 - ry * s,
-      s, depth,
-      world: p
+      x: (hand.worldX || 0) + position.x * c + position.z * q,
+      y: (hand.worldY || 0) + position.y,
+      z: (hand.worldZ || 0) - position.x * q + position.z * c
     };
+  }
+
+  handPinchWorld(hand) {
+    if (!hand || !hand.joints) return null;
+    const thumb = this.handJointWorld(hand, hand.joints["thumb-tip"]);
+    const index = this.handJointWorld(hand, hand.joints["index-finger-tip"]);
+    if (!thumb || !index) return null;
+    return { x: (thumb.x + index.x) / 2, y: (thumb.y + index.y) / 2, z: (thumb.z + index.z) / 2 };
   }
 
   // ---------- Drawing helpers ----------
@@ -105,7 +128,7 @@ class SpatialRenderer {
   // ---------- Scene primitives ----------
   drawDeskGrid() {
     const ctx = this.ctx;
-    const gridY = -0.28;
+    const gridY = this.comfortCone.apex.y;
     const size = 1.4;
     const step = 0.14;
     ctx.save();
@@ -137,59 +160,57 @@ class SpatialRenderer {
       const b = this.project({ x: size / 2, y: gridY, z });
       this._line(a, b, "rgba(148,163,184,0.09)", 1);
     }
-    // Center cross
-    const cx1 = this.project({ x: 0, y: gridY, z: 0 }); // not used
     ctx.restore();
   }
 
+  /* Cone geometry matches insideComfortCone() in hand-telemetry.js:
+     +Y axis, half angle a, slant length r, ring radius r*sin(a), ring
+     height r*cos(a). No ad-hoc scaling is applied. */
   drawComfortCone() {
     if (!this.comfortCone.enabled) return;
     const ctx = this.ctx;
-    const apex = { x: 0, y: -0.28, z: 0.18 }; // rested elbow position
-    const angle = this.comfortCone.angleDeg * Math.PI / 180;
+    const apex = this.comfortCone.apex;
+    const a = this.comfortCone.angleDeg * Math.PI / 180;
     const r = this.comfortCone.radiusM;
     const segments = 28;
+    const ringRadius = r * Math.sin(a);
+    const ringY = apex.y + r * Math.cos(a);
+    const ringPoint = i => {
+      const t = (i / segments) * Math.PI * 2;
+      return { x: apex.x + Math.cos(t) * ringRadius, y: ringY, z: apex.z + Math.sin(t) * ringRadius };
+    };
 
     ctx.save();
-    // Cone wireframe: apex to ring
+    const pa = this.project(apex);
     for (let i = 0; i < segments; i++) {
-      const a = (i / segments) * Math.PI * 2;
-      const ringX = Math.cos(a) * r * Math.sin(angle * 2);
-      const ringY = apex.y + r * Math.cos(angle) * 0.55;
-      const ringZ = apex.z - 0.18 + Math.sin(a) * r * Math.sin(angle) * 0.6;
-      // Spoke
-      const pa = this.project(apex);
-      const pr = this.project({ x: ringX, y: ringY, z: ringZ });
+      const pr = this.project(ringPoint(i));
       if (pa && pr) {
         ctx.strokeStyle = i % 4 === 0 ? "rgba(16,185,129,0.22)" : "rgba(16,185,129,0.09)";
         ctx.lineWidth = i % 4 === 0 ? 1 : 0.8;
         ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pr.x, pr.y); ctx.stroke();
       }
     }
-    // Ring
     ctx.strokeStyle = "rgba(16,185,129,0.28)";
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     for (let i = 0; i <= segments; i++) {
-      const a = (i / segments) * Math.PI * 2;
-      const ringX = Math.cos(a) * r * Math.sin(angle * 2);
-      const ringY = apex.y + r * Math.cos(angle) * 0.55;
-      const ringZ = apex.z - 0.18 + Math.sin(a) * r * Math.sin(angle) * 0.6;
-      const pp = this.project({ x: ringX, y: ringY, z: ringZ });
+      const pp = this.project(ringPoint(i));
       if (!pp) continue;
       if (i === 0) ctx.moveTo(pp.x, pp.y); else ctx.lineTo(pp.x, pp.y);
     }
     ctx.stroke();
 
-    // Label
-    const labelPos = this.project({ x: 0.32, y: 0.08, z: -0.05 });
+    const labelPos = this.project({ x: apex.x + 0.32, y: apex.y + 0.30, z: apex.z - 0.05 });
     if (labelPos) {
       ctx.fillStyle = "rgba(16,185,129,0.95)";
-      ctx.font = "700 10px Inter, system-ui, sans-serif";
-      ctx.fillText("◉ 30° Rested-Arm Comfort Cone", labelPos.x, labelPos.y);
+      ctx.font = "700 10px system-ui, sans-serif";
+      ctx.fillText("30 degree comfort cone (geometry overlay)", labelPos.x, labelPos.y);
+      const summary = this.modelSummary;
       ctx.fillStyle = "rgba(148,163,184,0.9)";
-      ctx.font = "500 10px Inter, system-ui, sans-serif";
-      ctx.fillText("68.4% less deltoid torque vs extended reach", labelPos.x, labelPos.y + 13);
+      ctx.font = "500 10px system-ui, sans-serif";
+      ctx.fillText(summary
+        ? "Modelled moment reduction: " + summary.reductionPct.toFixed(1) + "% between two postures"
+        : "Desk reference only; no physiological result", labelPos.x, labelPos.y + 13);
     }
     ctx.restore();
   }
@@ -203,12 +224,15 @@ class SpatialRenderer {
     ctx.setLineDash([5, 6]);
     ctx.beginPath();
     const R = this.curvedRadius;
-    for (let a = -0.85; a <= 0.85; a += 0.02) {
+    let first = true;
+    const halfArc = 34 * Math.PI / 180;
+    for (let i = 0; i <= 60; i++) {
+      const a = -halfArc + 2 * halfArc * i / 60;
       const x = Math.sin(a) * R;
       const z = Math.cos(a) * R - R + 0.02;
       const pp = this.project({ x, y: -0.27, z });
       if (!pp) continue;
-      if (a === -0.85) ctx.moveTo(pp.x, pp.y); else ctx.lineTo(pp.x, pp.y);
+      if (first) { ctx.moveTo(pp.x, pp.y); first = false; } else ctx.lineTo(pp.x, pp.y);
     }
     ctx.stroke();
     ctx.restore();
@@ -224,21 +248,8 @@ class SpatialRenderer {
 
     for (const { w, center } of withDepth) {
       if (!center) continue;
-      // Compute window corners in world space with slight cylindrical curve + tilt
-      const hw = w.w / 2, hh = w.h / 2;
-      // Window is a billboard facing slightly inward (yaw toward center)
-      const yaw = w.yaw || 0;
-      const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
-      const cornersLocal = [
-        { x: -hw, y: hh, z: 0 }, { x: hw, y: hh, z: 0 },
-        { x: hw, y: -hh, z: 0 }, { x: -hw, y: -hh, z: 0 },
-      ];
-      const corners = cornersLocal.map(p => {
-        const xr = p.x * cosYaw - p.z * sinYaw;
-        const zr = p.x * sinYaw + p.z * cosYaw;
-        return this.project({ x: w.x + xr, y: w.y + p.y, z: w.z + zr });
-      });
-      if (corners.some(c => !c)) continue;
+      const corners = this.windowQuad(w);
+      if (!corners) continue;
 
       const isGrabbed = this.grabbedWindow === w.id;
       const isHover = this.hoverWindow === w.id;
@@ -293,13 +304,13 @@ class SpatialRenderer {
 
       // Title
       ctx.fillStyle = "rgba(226,232,240,0.95)";
-      ctx.font = "700 11px Inter, system-ui, sans-serif";
+      ctx.font = "700 11px system-ui, sans-serif";
       ctx.fillText(w.title || w.id, minX + 8, minY + 12);
 
       // Tiny content lines (scrollable via index poke & micro-scroll)
       if (w.lines) {
         ctx.fillStyle = "rgba(148,163,184,0.95)";
-        ctx.font = "500 9.5px JetBrains Mono, monospace";
+        ctx.font = "500 9.5px ui-monospace, monospace";
         const off = Math.max(0, w.scrollOffset || 0);
         const first = Math.floor(off / 11);
         const frac = off - first * 11;
@@ -349,9 +360,9 @@ class SpatialRenderer {
     }
     // Two-hand corner stretch: dimension line + live scale readout
     if (this.stretch && this.stretch.w && this.hands.length >= 2) {
-      const a = this.hands[0], b = this.hands[1];
-      const pa = this.project({ x: (a.worldX || 0), y: (a.worldY || 0), z: (a.worldZ || 0) });
-      const pb = this.project({ x: (b.worldX || 0), y: (b.worldY || 0), z: (b.worldZ || 0) });
+      const contacts = this.stretch.contacts || this.hands.slice(0, 2).map(hand => this.handPinchWorld(hand));
+      const pa = this.project(contacts[0]);
+      const pb = this.project(contacts[1]);
       if (pa && pb) {
         const ctx = this.ctx;
         ctx.save();
@@ -368,7 +379,7 @@ class SpatialRenderer {
         // Readout
         const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2 - 12;
         ctx.fillStyle = "rgba(233,213,255,0.95)";
-        ctx.font = "700 10px JetBrains Mono, monospace";
+        ctx.font = "700 10px ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.fillText(`stretch ×${this.stretch.scale.toFixed(2)}`, mx, my);
         ctx.textAlign = "start";
@@ -389,7 +400,7 @@ class SpatialRenderer {
           ctx.strokeRect(c.x - w.w * 130, c.y - w.h * 130, w.w * 260, w.h * 260);
           ctx.setLineDash([]);
           ctx.fillStyle = "rgba(245,158,11,0.95)";
-          ctx.font = "700 9px JetBrains Mono, monospace";
+          ctx.font = "700 9px ui-monospace, monospace";
           ctx.fillText(`poke-scroll ▲▼ ${Math.round(this.poke.offset)}px`, c.x - w.w * 130, c.y - w.h * 130 - 6);
           ctx.restore();
         }
@@ -402,12 +413,7 @@ class SpatialRenderer {
     // Project all joints to screen
     const screenJoints = {};
     for (const [name, pos] of Object.entries(hand.joints)) {
-      // Hand world offset
-      const world = {
-        x: (hand.worldX || 0) + pos.x,
-        y: (hand.worldY || 0) + pos.y,
-        z: (hand.worldZ || 0) + pos.z
-      };
+      const world = this.handJointWorld(hand, pos);
       screenJoints[name] = { world, screen: this.project(world), local: pos };
     }
 
@@ -459,7 +465,7 @@ class SpatialRenderer {
       // Joint label on hover for thumb/index tips
       if ((name === "thumb-tip" || name === "index-finger-tip") && isHover) {
         ctx.fillStyle = "rgba(56,189,248,0.95)";
-        ctx.font = "600 9px Inter, sans-serif";
+        ctx.font = "600 9px system-ui, sans-serif";
         ctx.fillText(name === "thumb-tip" ? "thumb-tip" : "index-tip", sj.screen.x + 6, sj.screen.y - 6);
       }
     }
@@ -468,12 +474,13 @@ class SpatialRenderer {
     const indexTipS = screenJoints["index-finger-tip"]?.screen;
     const indexTipW = screenJoints["index-finger-tip"]?.world;
     if (indexTipS && indexTipW) {
-      // Ray direction: slightly forward along +Z in hand local, converted to world
+      // Ray direction is the hand-local +Z forward vector rotated by hand.yaw.
       const rayLen = isPinching ? 0.28 : 0.42;
+      const yaw = Number.isFinite(hand.yaw) ? hand.yaw : 0;
       const rayEndWorld = {
-        x: indexTipW.x + (Math.sin(hand.yaw || 0) * rayLen * 0.1),
-        y: indexTipW.y + 0.02,
-        z: indexTipW.z + rayLen
+        x: indexTipW.x + Math.sin(yaw) * rayLen,
+        y: indexTipW.y,
+        z: indexTipW.z + Math.cos(yaw) * rayLen
       };
       const rayEnd = this.project(rayEndWorld);
       if (rayEnd) {
@@ -507,7 +514,7 @@ class SpatialRenderer {
   }
 
   drawSpecsHUD() {
-    if (this.viewMode !== "specs") return;
+    if (this.viewMode !== "hud") return;
     const ctx = this.ctx;
     ctx.save();
     // Waveguide frame corners
@@ -533,17 +540,17 @@ class SpatialRenderer {
     ctx.fillStyle = "rgba(9,13,22,0.55)";
     ctx.fillRect(pad, pad, this.w - pad * 2, 22);
     ctx.fillStyle = "rgba(56,189,248,0.95)";
-    ctx.font = "700 10px JetBrains Mono, monospace";
-    ctx.fillText("◆  SPECS AR  •  Optical See-Through  •  Waveguide HUD  •  6DoF", pad + 8, pad + 14);
+    ctx.font = "700 10px ui-monospace, monospace";
+    ctx.fillText("HUD drawing style · desktop Canvas 2D", pad + 8, pad + 14);
     ctx.fillStyle = "rgba(16,185,129,0.9)";
-    ctx.fillText("◉ HANDS-FREE", this.w - pad - 88, pad + 14);
+    ctx.fillText("DESKTOP", this.w - pad - 60, pad + 14);
     ctx.restore();
   }
 
   drawGroundShadow() {
     // Subtle ellipse under center
     const ctx = this.ctx;
-    const c = this.project({ x: 0, y: -0.28, z: -0.22 });
+    const c = this.project({ x: 0, y: this.comfortCone.apex.y, z: -0.22 });
     if (!c) return;
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,0.18)";
@@ -568,7 +575,12 @@ class SpatialRenderer {
     this.drawDeskGrid();
     this.drawGroundShadow();
     this.drawCurvedGuides();
+    /* The cone inspector renders the geometry overlay even when the
+       general cone toggle is off, so the tab always shows something. */
+    const coneWasEnabled = this.comfortCone.enabled;
+    if (this.viewMode === "cone") this.comfortCone.enabled = true;
     this.drawComfortCone();
+    this.comfortCone.enabled = coneWasEnabled;
     this.drawWindows();
     this.drawHands();
     this.drawRadialPalette();
@@ -612,13 +624,13 @@ class SpatialRenderer {
       if (isSel) { ctx.strokeStyle = "rgba(168,85,247,0.8)"; ctx.lineWidth = 1.4; ctx.stroke(); }
       // Icon
       ctx.fillStyle = isSel ? "#E9D5FF" : "rgba(148,163,184,0.9)";
-      ctx.font = "600 13px Inter, system-ui, sans-serif";
+      ctx.font = "600 13px system-ui, sans-serif";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(items[i].icon, ix, iy);
       // Label for selected
       if (isSel) {
         ctx.fillStyle = "rgba(233,213,255,0.95)";
-        ctx.font = "700 11px Inter, system-ui, sans-serif";
+        ctx.font = "700 11px system-ui, sans-serif";
         ctx.fillText(items[i].label, cx, cy);
         // Commit progress arc
         const p = Math.min(1, Math.max(0, ((this.radial.phase || 0) % 2.6) / 2.6));
@@ -659,8 +671,8 @@ class SpatialRenderer {
       ctx.restore();
     } else {
       ctx.fillStyle = "rgba(148,163,184,0.7)";
-      ctx.font = "600 10px Inter, system-ui, sans-serif";
-      ctx.fillText("camera starting…", x0 + 12, y0 + ph / 2);
+      ctx.font = "600 10px system-ui, sans-serif";
+      ctx.fillText("camera starting", x0 + 12, y0 + ph / 2);
     }
     // Centroid crosshair
     const hand = window.__spatialHandWebcamHand;
@@ -673,8 +685,8 @@ class SpatialRenderer {
       ctx.moveTo(hx, hy - 11); ctx.lineTo(hx, hy + 11); ctx.stroke();
     }
     ctx.fillStyle = "rgba(226,232,240,0.9)";
-    ctx.font = "700 9px JetBrains Mono, monospace";
-    ctx.fillText("LIVE HAND TRACK", x0 + 8, y0 + ph - 6);
+    ctx.font = "700 9px ui-monospace, monospace";
+    ctx.fillText("CAMERA CENTROID", x0 + 8, y0 + ph - 6);
     ctx.restore();
   }
 }

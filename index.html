@@ -3,227 +3,239 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SpatialHand Studio - 25-Joint WebXR Hand-Tracking Spatial Workspace</title>
-<meta name="description" content="SpatialHand Studio - WebXR input and a 25-joint spatial workspace simulator. Local hand input, tested pinch hysteresis, and an illustrative shoulder torque model.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<title>SpatialHand Studio - 25-joint hand rig and WebXR input bridge</title>
+<meta name="description" content="A zero-build browser app: a 25-joint hand rig, a 1-Euro filtered pinch state machine, curved window manipulation and a WebXR hand input bridge, drawn with Canvas 2D.">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<!-- Top bar -->
 <nav class="topbar">
   <div class="brand">
     <div class="brand-mark">SH</div>
     <div>
       <h1>SpatialHand <span>Studio</span></h1>
-      <p>25-Joint WebXR Hand-Tracking · Spatial Workspace</p>
     </div>
   </div>
   <div class="topbar-actions">
-    <span class="badge">Meta VR Start 2026 · Productivity</span>
-    <span class="badge" style="background:rgba(168,85,247,0.12);border-color:rgba(168,85,247,0.22);color:#A855F7">Learn AR with SPECS</span>
+    <span class="badge" id="renderer-engine">Renderer: Canvas 2D</span>
+    <span class="badge" id="xr-support-status">WebXR: checking</span>
   </div>
 </nav>
 
-<!-- Hero + XR entry -->
 <header class="hero">
   <div class="hero-left">
-    <h2>Hands-first spatial productivity - <em>rested-arm ergonomics</em> meets curved WebXR workspaces</h2>
-    <p class="hero-sub">
-      A zero-build, dependency-free <strong>Immersive Web SDK / WebXR Hand Input</strong> workspace.
-      On headset, uses real <code>navigator.xr</code> <code>hand-tracking</code> + <code>local-floor</code>.
-      On desktop, the <strong>Interactive 3D 25-Joint Hand Rig &amp; Spatial Desk Simulator</strong> runs in full fidelity.
-    </p>
-    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <button id="btn-enter-xr" class="btn-xr"><span class="dot"></span><span class="btn-label">Enter WebXR Hand Session (Quest / AR Glasses)</span></button>
-      <button id="btn-reset-view" class="btn-ghost">↺ Reset Workspace</button>
+    <h2>Inspect and manipulate a 25-joint hand rig in a <em>curved window layout</em></h2>
+    <div class="scope-copy">
+      Zero build step, no external runtime. On a headset, the app requests <code>immersive-ar</code> or
+      <code>immersive-vr</code> with <code>hand-tracking</code> and <code>local-floor</code> when the browser
+      reports support. On desktop, the hand rig, curved guides and windows are drawn with Canvas 2D
+      perspective projection. Joint samples pass through a documented 1-Euro filter and a hysteresis
+      pinch state machine. Readouts distinguish joint samples, render timing and the posture model.
+    </div>
+    <div class="hero-actions">
+      <button id="btn-enter-xr" class="btn-xr"><span class="dot"></span><span class="btn-label">Request WebXR Hand Session</span></button>
+      <button id="btn-reset-view" class="btn-ghost">Reset layout</button>
     </div>
   </div>
-  <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+  <div class="hero-right">
     <div class="mode-switch" role="tablist" aria-label="View mode">
-      <button class="active" data-view-mode="quest" role="tab" aria-selected="true">Quest 3 Mixed Reality Passthrough</button>
-      <button data-view-mode="specs" role="tab">SPECS AR Optical See-Through HUD</button>
-      <button data-view-mode="cone" role="tab">Ergonomic Comfort Cone Inspector</button>
+      <button class="active" data-view-mode="passthrough" role="tab" aria-selected="true">Passthrough style</button>
+      <button data-view-mode="hud" role="tab" aria-selected="false">HUD overlay</button>
+      <button data-view-mode="cone" role="tab" aria-selected="false">Comfort cone</button>
     </div>
-    <span style="font-size:11px;color:var(--text-dim)">Passthrough · Optical See-Through · Ergonomic Overlay</span>
+    <span class="hero-note">Three desktop drawing styles. No optical see-through or passthrough hardware is used.</span>
   </div>
 </header>
 
-<!-- Gesture preset bar -->
 <div class="gesture-bar" role="toolbar" aria-label="Hand gesture presets">
-  <button class="gesture-chip active" data-gesture="pinch"><i>🤏</i> Index-Thumb Pinch (Grab &amp; Dock Spatial Window)</button>
-  <button class="gesture-chip" data-gesture="stretch"><i>↔️</i> Two-Hand Corner Stretch (Curved Cylinder Resize)</button>
-  <button class="gesture-chip" data-gesture="palm-up"><i>🫱</i> Palm-Up Wrist Glance (Summon Quick-Action Radial Palette)</button>
-  <button class="gesture-chip" data-gesture="poke"><i>👆</i> Index Poke &amp; Micro-Scroll (Rested-Arm Precision Typing/Scrolling)</button>
-  <button class="gesture-chip" data-gesture="mouse"><i>🖱️</i> Live Mouse / Touch Articulated Hand Control</button>
+  <button class="gesture-chip active" data-gesture="pinch"><i>1</i> Pinch grab</button>
+  <button class="gesture-chip" data-gesture="stretch"><i>2</i> Two-hand stretch</button>
+  <button class="gesture-chip" data-gesture="palm-up"><i>3</i> Palm-up palette</button>
+  <button class="gesture-chip" data-gesture="poke"><i>4</i> Index poke scroll</button>
+  <button class="gesture-chip" data-gesture="mouse"><i>5</i> Mouse and touch</button>
 </div>
 
-<!-- Main layout -->
 <main class="main">
 
-  <!-- Left panel -->
   <aside class="panel">
     <div class="panel-head">
-      <h3>25-Joint XRHand Kinematics &amp; Gesture Classifier</h3>
+      <h3>Hand rig, gesture rules and signal filters</h3>
       <span class="mini">WebXR Hand Input API</span>
     </div>
     <div class="panel-body">
       <div class="kv-grid">
         <div class="kv">
-          <div class="kv-label"><b>Thumb-Index Pinch Distance (mm)</b></div>
-          <div id="kv-pinch" class="kv-value"> - </div>
+          <div class="kv-label"><b>Thumb to index tip distance</b><br><span class="kv-sub">Filtered, in mm</span></div>
+          <div id="kv-pinch" class="kv-value">waiting</div>
         </div>
         <div class="kv">
-          <div class="kv-label"><b>Wrist Pitch/Roll (deg)</b><br><span class="kv-sub">Pitch: <b id="kv-pitch-inline"> - </b> · Roll: <b id="kv-roll-inline"> - </b></span></div>
-          <div id="kv-pitch" class="kv-value violet" style="display:none"> - </div>
-          <div id="kv-roll" class="kv-value violet" style="display:none"> - </div>
+          <div class="kv-label"><b>Wrist orientation</b><br><span class="kv-sub">Pitch <b id="kv-pitch-inline">waiting</b> · Roll <b id="kv-roll-inline">waiting</b></span></div>
+          <div id="kv-basis" class="kv-value violet">palm frame</div>
         </div>
         <div class="kv">
-          <div class="kv-label"><b>Ray Stability Jitter Filter (1-Euro Filter Hz)</b></div>
-          <div id="kv-jitter" class="kv-value"> - </div>
+          <div class="kv-label"><b>1-Euro filter</b><br><span class="kv-sub">Minimum cutoff <b id="kv-cutoff">waiting</b></span></div>
+          <div id="kv-residual" class="kv-value">waiting</div>
         </div>
         <div class="kv">
-          <div class="kv-label"><b>Shoulder Torque Fatigue Score (N·m)</b><br><span class="kv-sub">Rested: <b id="kv-fatigue-inline"> - </b> · Elevated: <b id="kv-fatigue-elevated-inline"> - </b></span></div>
-          <div id="kv-fatigue" class="kv-value green" style="display:none"> - </div>
-          <div id="kv-fatigue-elevated" class="kv-value amber" style="display:none"> - </div>
+          <div class="kv-label"><b>Modelled shoulder moment</b><br><span class="kv-sub">Rested <b id="kv-rested-inline">waiting</b> · Elevated <b id="kv-elevated-inline">waiting</b></span></div>
+          <div id="kv-model-note" class="kv-value green">quasi-static</div>
         </div>
         <div class="kv">
-          <div class="kv-label"><b>Torque Reduction</b><br>Rested vs elevated</div>
-          <div id="kv-reduction" class="kv-value green"> - </div>
+          <div class="kv-label"><b>Modelled moment reduction</b><br><span class="kv-sub">Two fixed postures only</span></div>
+          <div id="kv-reduction" class="kv-value green">waiting</div>
         </div>
         <div class="kv">
-          <div class="kv-label"><b>Pinch FSM State</b><br>Hysteresis state machine</div>
-          <div id="kv-state" class="kv-value"> - </div>
+          <div class="kv-label"><b>Pinch state machine</b><br><span class="kv-sub">Enter, confirm, drag, release</span></div>
+          <div id="kv-state" class="kv-value">IDLE</div>
         </div>
       </div>
 
       <div class="ctrl-group">
-        <div class="ctrl-label"><span>Pinch Hysteresis Threshold (12mm - 28mm)</span><span id="pinch-threshold-val">20 mm</span></div>
-        <input id="pinch-threshold" type="range" min="12" max="28" step="1" value="20">
+        <div class="ctrl-label"><span>Pinch enter threshold</span><span id="pinch-threshold-val">20 mm enter / 28 mm exit</span></div>
+        <input id="pinch-threshold" type="range" min="12" max="28" step="1" value="20" aria-label="Pinch enter threshold in millimetres">
       </div>
       <div class="ctrl-group">
-        <div class="ctrl-label"><span>1-Euro Filter Cutoff</span><span id="euro-cutoff-val">1.2 Hz</span></div>
-        <input id="euro-cutoff" type="range" min="0.4" max="4" step="0.1" value="1.2">
+        <div class="ctrl-label"><span>1-Euro minimum cutoff</span><span id="euro-cutoff-val">1.2 Hz</span></div>
+        <input id="euro-cutoff" type="range" min="0.4" max="4" step="0.1" value="1.2" aria-label="1-Euro minimum cutoff in hertz">
       </div>
       <div class="ctrl-group">
-        <div class="ctrl-label"><span>Curved Desk Radius (0.55m - 1.2m)</span><span id="desk-radius-val">0.85 m</span></div>
-        <input id="desk-radius" type="range" min="0.55" max="1.2" step="0.05" value="0.85">
+        <div class="ctrl-label"><span>Curved guide radius</span><span id="desk-radius-val">0.85 m</span></div>
+        <input id="desk-radius" type="range" min="0.55" max="1.2" step="0.05" value="0.85" aria-label="Curved guide radius in metres">
       </div>
 
       <div class="toggle-row">
-        <div><label>Ergonomic Comfort Cone</label><p>30° rested-arm overlay</p></div>
-        <div id="toggle-comfort-cone" class="switch on" role="switch" aria-checked="true" tabindex="0"></div>
+        <div><label>Comfort cone overlay</label><p>30 degree half-angle about the +Y axis</p></div>
+        <div id="toggle-comfort-cone" class="switch on" role="switch" aria-checked="true" tabindex="0" aria-label="Comfort cone overlay"></div>
       </div>
       <div class="toggle-row">
-        <div><label>Spatial Audio Feedback</label><p>Web Audio binaural clicks</p></div>
-        <div id="toggle-spatial-audio" class="switch on" role="switch" aria-checked="true" tabindex="0"></div>
+        <div><label>Spatial audio cues</label><p>Web Audio tones with a PannerNode fallback chain</p></div>
+        <div id="toggle-spatial-audio" class="switch on" role="switch" aria-checked="true" tabindex="0" aria-label="Spatial audio cues"></div>
+      </div>
+      <div class="toggle-row">
+        <div><label>Keyboard shortcuts</label><p>Space pinch and R reset can be turned off</p></div>
+        <div id="toggle-keyboard-shortcuts" class="switch on" role="switch" aria-checked="true" tabindex="0" aria-label="Keyboard shortcuts"></div>
       </div>
 
       <div class="divider"></div>
-      <div class="panel-head" style="padding:0 0 8px;border:none;background:none"><h3>Joint Hierarchy (25 joints)</h3></div>
+      <div class="section-title">Joint hierarchy (25 joints)</div>
       <div id="joint-tree" class="joint-tree"></div>
-      <p style="margin-top:8px;font-size:11px;color:var(--text-dim)">Matches exact WebXR <code>XRHand</code> spec - wrist + 5× finger chains.</p>
+      <p class="fine-print">Joint names follow the WebXR <code>XRHand</code> list: one wrist and five finger chains. Rig coordinates are illustrative, not measured anatomy.</p>
     </div>
   </aside>
 
-  <!-- Center viewport -->
   <section class="viewport-wrap">
     <div class="viewport-head">
-      <h3>Interactive 3D Spatial Canvas</h3>
+      <h3>Canvas 2D viewport</h3>
       <div class="viewport-actions">
-        <span class="pill live">60 fps</span>
-        <span id="kv-fps" class="pill"> - </span>
-        <button id="btn-pinch-toggle" class="btn-ghost" style="font-size:11px">○ Pinch Toggle (Space)</button>
+        <span id="kv-fps" class="pill">Measuring</span>
+        <button id="btn-pinch-toggle" class="btn-ghost" style="font-size:11px">Hold pinch (Space)</button>
       </div>
     </div>
 
-    <canvas id="spatial-canvas" width="800" height="500" aria-label="3D spatial workspace with articulated hands and curved windows"></canvas>
+    <canvas id="spatial-canvas" width="800" height="500" aria-label="Canvas 2D view of a 25-joint hand rig and curved windows"></canvas>
 
     <div class="canvas-hint">
-      <span><kbd>Drag</kbd> move hand &amp; windows</span>
+      <span><kbd>Drag</kbd> move hand and windows</span>
       <span><kbd>Shift + Drag</kbd> orbit</span>
-      <span><kbd>Space</kbd> pinch / grab</span>
+      <span><kbd>Space</kbd> pinch</span>
       <span><kbd>R</kbd> reset</span>
-      <span style="margin-left:auto;color:var(--text-muted)">Click a gesture chip above to inspect kinematics →</span>
+      <span class="hint-end">Select a gesture preset to change the rig pose</span>
     </div>
 
     <div class="legend">
-      <span class="legend-item"><span class="legend-dot" style="background:#38BDF8"></span> Pinch ray</span>
-      <span class="legend-item"><span class="legend-dot" style="background:#A855F7"></span> Grab / drag</span>
-      <span class="legend-item"><span class="legend-dot" style="background:#10B981"></span> Comfort cone &amp; snap ring</span>
-      <span class="legend-item"><span class="legend-dot" style="background:#F59E0B"></span> Hover / proximity</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#38BDF8"></span> Index ray</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#A855F7"></span> Grab and drag</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#10B981"></span> Comfort cone and snap ring</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#F59E0B"></span> Hover and poke</span>
     </div>
 
     <div class="stats-bar">
-      <div class="stat"><strong id="stat-fps"> - </strong><span>Render FPS</span></div>
-      <div class="stat"><strong style="color:var(--cyan)">25</strong><span>Joints / Hand</span></div>
-      <div class="stat"><strong style="color:var(--green)">68.4%</strong><span>Torque Reduction</span></div>
+      <div class="stat"><strong id="stat-fps">waiting</strong><span>Measured render FPS</span></div>
+      <div class="stat"><strong id="stat-joints">25</strong><span>Joints per hand</span></div>
+      <div class="stat"><strong id="stat-reduction">waiting</strong><span>Modelled moment reduction</span></div>
     </div>
   </section>
 
-  <!-- Right panel -->
   <aside class="panel">
     <div class="panel-head">
-      <h3>Spatial Workspace Layout &amp; Export Studio</h3>
-      <span class="mini">Curved Desk · Custom Scene Format</span>
+      <h3>Window layout, exports and telemetry</h3>
+      <span class="mini">Curved guide · custom scene format</span>
     </div>
     <div class="panel-body">
       <div class="app-list">
         <div class="app-card">
-          <div class="app-icon" style="background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.22)">⌘</div>
-          <div><h4>Code Studio</h4><p>Editor · Architecture</p></div>
-          <button class="btn-sm on" data-app-toggle="code-studio">On</button>
+          <div class="app-icon" style="background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.22)">E</div>
+          <div><h4>Code editor surface</h4><p>Static sample lines</p></div>
+          <button class="btn-sm on" data-app-toggle="code-studio" aria-pressed="true">On</button>
         </div>
         <div class="app-card">
-          <div class="app-icon" style="background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.22)">◆</div>
-          <div><h4>3D Node Inspector</h4><p>Shader graph · Model</p></div>
-          <button class="btn-sm on" data-app-toggle="node-graph">On</button>
+          <div class="app-icon" style="background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.22)">G</div>
+          <div><h4>Node graph surface</h4><p>Static sample lines</p></div>
+          <button class="btn-sm on" data-app-toggle="node-graph" aria-pressed="true">On</button>
         </div>
         <div class="app-card">
-          <div class="app-icon" style="background:rgba(16,185,129,0.14);border:1px solid rgba(16,185,129,0.22)">◉</div>
-          <div><h4>Focus Timer &amp; Spatial Audio Cue</h4><p>25:00 sprint · binaural chime</p></div>
-          <button class="btn-sm on" data-app-toggle="sprint-kanban">On</button>
+          <div class="app-icon" style="background:rgba(16,185,129,0.14);border:1px solid rgba(16,185,129,0.22)">T</div>
+          <div><h4>Focus timer surface</h4><p>25:00 countdown, paused by default</p></div>
+          <button class="btn-sm on" data-app-toggle="sprint-kanban" aria-pressed="true">On</button>
         </div>
       </div>
 
       <div class="divider"></div>
 
-      <button id="btn-export-manifest" class="btn-primary">⬇ Export Spatial Scene Manifest (JSON)</button>
+      <button id="btn-export-manifest" class="btn-primary">Export scene manifest (JSON)</button>
       <div id="manifest-anchor"></div>
 
-      <div style="margin-top:10px">
-        <button id="btn-run-bench" class="btn-secondary">▶ Run Ergonomic Fatigue Benchmark (60s Simulation)</button>
-        <div class="progress" style="margin-top:10px"><i id="bench-progress-bar" style="width:0%"></i></div>
-        <p id="bench-status" style="margin-top:6px;font-size:11px;color:var(--text-muted)">Idle - tap to simulate 60s session.</p>
+      <div class="bench-block">
+        <button id="btn-run-bench" class="btn-secondary">Compare two posture moments (6 s animation)</button>
+        <div class="progress"><i id="bench-progress-bar" style="width:0%"></i></div>
+        <p id="bench-status" class="fine-print">Idle. The button runs a 6 s animation and recomputes the same two model values.</p>
         <div id="bench-result" class="bench-card" style="display:none"></div>
-        <p id="bench-reduction" style="display:none"></p>
+        <p id="bench-reduction" class="fine-print" style="display:none"></p>
       </div>
 
       <div class="divider"></div>
 
-      <h4 style="font-size:11px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px">Why Rested-Arm?</h4>
-      <p style="font-size:12px;line-height:1.6;color:var(--text-muted)">
-        Gorilla-arm fatigue is the #1 killer of spatial productivity.
-        SpatialHand keeps elbows docked on the desk and uses <strong style="color:var(--text)">micro-pinch &amp; wrist-glance</strong>
-        gestures inside a <strong style="color:var(--green)">30° comfort cone</strong>. The illustrative model estimates
-        <strong style="color:var(--text)">68.4% lower shoulder moment</strong> for its two selected postures, not a measured human outcome.
+      <div class="section-title">Signal telemetry</div>
+      <p class="fine-print">Computed from recorded frames of the current session. No frame leaves the browser.</p>
+      <div class="telemetry-grid">
+        <div class="tel"><span>Frames</span><strong id="tel-frames">0</strong></div>
+        <div class="tel"><span>Pinch mean</span><strong id="tel-mean">0 mm</strong></div>
+        <div class="tel"><span>Pinch std dev</span><strong id="tel-std">0 mm</strong></div>
+        <div class="tel"><span>Wrist path efficiency</span><strong id="tel-path">1.0000</strong></div>
+        <div class="tel"><span>Cone violations</span><strong id="tel-cone">0</strong></div>
+        <div class="tel"><span>Pinch false starts</span><strong id="tel-false-starts">0</strong></div>
+      </div>
+      <div class="telemetry-actions">
+        <button id="btn-export-telemetry" class="btn-secondary">Export frame CSV</button>
+        <button id="btn-reset-telemetry" class="btn-ghost">Reset telemetry</button>
+      </div>
+      <pre id="telemetry-report" class="manifest-box" style="display:none"></pre>
+
+      <div class="divider"></div>
+
+      <div class="section-title">Posture comparison</div>
+      <p class="body-copy">
+        The model uses a two-segment quasi-static shoulder moment. It compares one rested posture with one
+        elevated posture at a fixed 75 kg reference mass. It does not measure muscle activation, fatigue,
+        comfort, task accuracy or completion time. The 6 s animation only recomputes the algebra.
       </p>
-      <p style="margin-top:8px;font-size:11px;color:var(--text-dim)">
-        68.4% reduction in deltoid torque vs arm-extended VR UI - quasi-static shoulder moment M = g·(m<sub>ua</sub>·r<sub>ua</sub>·sin θ<sub>ua</sub> + m<sub>fa</sub>·(L<sub>ua</sub>·sin θ<sub>ua</sub> + r<sub>fa</sub>·sin θ<sub>fa</sub>)). Rested: 14° upper-arm / 20.4° elbow (2.99 N·m) vs gorilla-arm 58° / 62° (9.46 N·m), Drillis-Contini 75 kg anthropometry.
+      <p class="fine-print">
+        M = g · (m_ua · r_ua · sin(a) + m_fa · (L_ua · sin(a) + r_fa · sin(b))). Rested: a = 14 deg,
+        b = 20.4 deg, 2.99 N·m. Elevated: a = 58 deg, b = 62 deg, 9.46 N·m. Difference: 68.4%.
+        Segment fractions and centre of mass ratios follow Drillis and Contini anthropometry.
       </p>
     </div>
   </aside>
 
 </main>
 
-<footer style="text-align:center;padding:14px 18px;font-size:11px;color:var(--text-dim);border-top:1px solid var(--panel-border)">
-  SpatialHand Studio · Built for <strong style="color:var(--text)">Meta VR Start Developer Competition 2026</strong> (Productivity &amp; Lifestyle · Hands-First Interaction Quality · Immersive Web SDK) &amp;
-  <strong style="color:var(--text)">Learn AR with SPECS</strong> (AR Glasses Hands-Free Spatial Workspace) · Zero-build · Dependency-free · All rendering via Canvas 2D perspective projection
+<footer class="footer">
+  SpatialHand Studio · Canvas 2D renderer · WebXR hand input bridge when supported · MIT licensed · All values are computed locally
 </footer>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<script src="js/hand-telemetry.js"></script>
 <script src="js/xr-hand-kinematics.js"></script>
 <script src="js/spatial-renderer.js"></script>
 <script src="js/app.js"></script>
