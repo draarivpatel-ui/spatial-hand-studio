@@ -1405,6 +1405,440 @@ function pulseXRHandHaptics(src) {
   } catch (_) { /* Haptics are optional. */ }
 }
 
+// ---------- Filter and biomechanics lab ----------
+/* The lab panel is optional: if js/filter-lab.js is absent the whole
+   section hides and nothing else changes. Every lab value comes from
+   FilterLab's deterministic synthetic data. */
+const lab = {
+  available: false,
+  state: null,
+  comparison: null,
+  run: null,
+  digestHex: ""
+};
+
+const LAB_STATE_COLORS = {
+  IDLE: "#94A3B8", HOVER: "#38BDF8", PINCH_START: "#A855F7",
+  DRAGGING: "#10B981", RELEASE: "#F59E0B"
+};
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function initLab() {
+  const section = el("filter-lab-section");
+  if (!section) return;
+  if (typeof FilterLab === "undefined" ||
+      typeof FilterLab.kinematicsAvailable !== "function" || !FilterLab.kinematicsAvailable()) {
+    section.hidden = true;
+    return;
+  }
+  lab.available = true;
+  lab.state = FilterLab.normalizeLabState(null);
+
+  document.querySelectorAll("[data-lab-traj]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      lab.state.trajectory = btn.dataset.labTraj;
+      syncLabControls();
+      recomputeLab();
+      SFX.click();
+    });
+  });
+
+  const tbody = el("lab-compare-body");
+  if (tbody) tbody.addEventListener("click", e => {
+    const t = e.target;
+    if (!t || typeof t.closest !== "function") return;
+    const apply = t.closest("[data-lab-apply]");
+    if (apply) { applyLabProfileToRig(apply.getAttribute("data-lab-apply")); return; }
+    const pick = t.closest("[data-lab-pick]");
+    if (pick) {
+      lab.state.profile = pick.getAttribute("data-lab-pick");
+      syncLabControls();
+      recomputeLab();
+      SFX.click();
+    }
+  });
+
+  const bindNum = (id, onValue) => {
+    const input = el(id);
+    if (!input) return;
+    input.addEventListener("input", e => {
+      const v = parseFloat(e.target.value);
+      if (!Number.isFinite(v)) return;
+      onValue(v);
+      syncLabControls();
+      recomputeLab();
+    });
+  };
+  bindNum("lab-enter", v => {
+    lab.state.enterMm = v;
+    if (lab.state.exitMm <= v) lab.state.exitMm = Math.min(FilterLab.STATE_LIMITS.exitMaxMm, v + 2);
+  });
+  bindNum("lab-exit", v => {
+    lab.state.exitMm = v;
+    if (v <= lab.state.enterMm) lab.state.enterMm = Math.max(FilterLab.STATE_LIMITS.enterMinMm, v - 2);
+  });
+  bindNum("lab-arm", v => { lab.state.armDeg = v; });
+  bindNum("lab-elbow", v => { lab.state.elbowDeg = v; });
+
+  const wire = (id, fn) => { const b = el(id); if (b) b.addEventListener("click", fn); };
+  wire("btn-lab-json", () => labExport("json"));
+  wire("btn-lab-csv", () => labExport("csv"));
+  wire("btn-lab-md", () => labExport("md"));
+  wire("btn-lab-copy-link", copyLabLink);
+  wire("btn-lab-verify", labVerifyIntegrity);
+  wire("btn-lab-tamper", labTamperDemo);
+  wire("btn-lab-selftest", labRunSelfTests);
+  wire("btn-lab-apply", () => applyLabProfileToRig(lab.state && lab.state.profile));
+
+  if (typeof window !== "undefined" && window.addEventListener) {
+    window.addEventListener("hashchange", () => {
+      if (typeof location !== "undefined") applyLabHash(location.hash);
+    });
+  }
+  if (typeof location !== "undefined" && location.hash) applyLabHash(location.hash);
+  syncLabControls();
+  recomputeLab();
+}
+
+function syncLabControls() {
+  if (!lab.available || !lab.state) return;
+  document.querySelectorAll("[data-lab-traj]").forEach(b => {
+    const on = b.dataset.labTraj === lab.state.trajectory;
+    b.classList.toggle("active", on);
+    if (b.setAttribute) b.setAttribute("aria-pressed", String(on));
+  });
+  const setVal = (id, v) => { const n = el(id); if (n) n.value = String(v); };
+  setVal("lab-enter", lab.state.enterMm);
+  setVal("lab-exit", lab.state.exitMm);
+  setVal("lab-arm", lab.state.armDeg);
+  setVal("lab-elbow", lab.state.elbowDeg);
+  setText("lab-enter-val", lab.state.enterMm + " mm");
+  setText("lab-exit-val", lab.state.exitMm + " mm");
+  setText("lab-arm-val", lab.state.armDeg + " deg");
+  setText("lab-elbow-val", lab.state.elbowDeg + " deg");
+  const applyBtn = el("btn-lab-apply");
+  if (applyBtn) {
+    const p = FilterLab.FILTER_PROFILES[lab.state.profile];
+    const ok = !!(p && p.appliesToLiveRig);
+    applyBtn.disabled = !ok;
+    applyBtn.title = ok ? "Copy this profile's 1-Euro parameters into the live rig"
+      : "This comparator does not map onto the live 1-Euro bank";
+  }
+}
+
+function recomputeLab() {
+  if (!lab.available || !lab.state || typeof FilterLab === "undefined") return;
+  lab.state = FilterLab.normalizeLabState(lab.state);
+  const opts = { enterMm: lab.state.enterMm, exitMm: lab.state.exitMm };
+  lab.comparison = FilterLab.runComparison(lab.state.trajectory, opts);
+  lab.run = FilterLab.runTrajectory(lab.state.trajectory, lab.state.profile, opts);
+  lab.digestHex = FilterLab.digestFor(lab.state).sha256;
+
+  setText("lab-traj-desc", FilterLab.TRAJECTORIES[lab.state.trajectory].description);
+  setText("lab-digest", lab.digestHex);
+  const moment = FilterLab.quasiStaticShoulderMomentNm({
+    armAbductionDeg: lab.state.armDeg, elbowFlexDeg: lab.state.elbowDeg
+  });
+  setText("lab-moment-val", moment.toFixed(2) + " N.m");
+  renderLabTable();
+  renderLabTraceChart();
+  renderLabParetoChart();
+  renderLabSweepChart();
+  if (typeof history !== "undefined" && history && history.replaceState) {
+    try { history.replaceState(null, "", FilterLab.encodeBookmarkHash(lab.state)); } catch (_) { /* file:// and sandboxed frames may refuse */ }
+  }
+}
+
+function applyLabHash(hashStr) {
+  if (!lab.available || typeof FilterLab === "undefined") return false;
+  const dec = FilterLab.decodeBookmarkHash(hashStr);
+  if (!dec.ok) return false;
+  lab.state = dec.state;
+  syncLabControls();
+  recomputeLab();
+  return true;
+}
+
+function applyLabProfileToRig(profileId) {
+  if (typeof FilterLab === "undefined") return;
+  const p = FilterLab.FILTER_PROFILES[profileId];
+  if (!p || !p.appliesToLiveRig || !filterBank) {
+    toast("That comparator profile does not map onto the live 1-Euro bank");
+    return;
+  }
+  filterBank.opts.freq = p.freq;
+  filterBank.opts.minCutoff = p.minCutoff;
+  filterBank.opts.beta = p.beta;
+  filterBank.opts.dCutoff = p.dCutoff;
+  for (const f of filterBank.filters.values()) {
+    f.freq = p.freq; f.minCutoff = p.minCutoff; f.beta = p.beta; f.dCutoff = p.dCutoff;
+  }
+  filterBank.reset();
+  state.euroCutoff = p.minCutoff;
+  const slider = el("euro-cutoff");
+  if (slider) slider.value = String(p.minCutoff);
+  setText("euro-cutoff-val", p.minCutoff.toFixed(1) + " Hz");
+  toast("Live rig now runs " + p.label + " (minCutoff " + p.minCutoff + " Hz, beta " + p.beta + ")");
+  SFX.click();
+}
+
+function renderLabTable() {
+  const tbody = el("lab-compare-body");
+  if (!tbody || !lab.comparison) return;
+  tbody.innerHTML = lab.comparison.rows.map(r => {
+    const m = r.metrics, p = r.profile;
+    const sel = p.id === lab.state.profile;
+    return '<tr class="' + (sel ? "sel" : "") + '">' +
+      '<td><button class="lab-pick' + (sel ? " on" : "") + '" data-lab-pick="' + p.id + '">' + escapeHtml(p.label) + "</button></td>" +
+      "<td>" + m.jitterRmsMm.toFixed(3) + "</td>" +
+      "<td>" + m.lagMs.toFixed(1) + "</td>" +
+      "<td>" + (m.settleLagMs90 === null ? "-" : m.settleLagMs90.toFixed(0)) + "</td>" +
+      "<td>" + m.falsePinchTransitions + "</td>" +
+      "<td>" + (m.recoveryFrames === null ? "-" : m.recoveryFrames) + "</td>" +
+      "<td>" + (p.appliesToLiveRig
+        ? '<button class="btn-sm" data-lab-apply="' + p.id + '">Apply</button>'
+        : '<span class="lab-na">compare only</span>') + "</td></tr>";
+  }).join("");
+}
+
+function renderLabTraceChart() {
+  const box = el("lab-trace-chart");
+  if (!box || !lab.run) return;
+  const run = lab.run;
+  const samples = run.samples;
+  const n = samples.length;
+  const W = 660, padL = 46, padR = 12, padT = 12, topH = 100, gapH = 16, botH = 70;
+  const H = padT + topH + gapH + botH + 8;
+  const xs = i => padL + (W - padL - padR) * (n <= 1 ? 0 : i / (n - 1));
+
+  const pinchVals = [];
+  const xVals = [];
+  for (const s of samples) {
+    if (Number.isFinite(s.rawPinch)) pinchVals.push(s.rawPinch);
+    if (Number.isFinite(s.filtPinch)) pinchVals.push(s.filtPinch);
+    if (Number.isFinite(s.rawX)) xVals.push(s.rawX);
+    if (Number.isFinite(s.filtX)) xVals.push(s.filtX);
+    if (Number.isFinite(s.truthX)) xVals.push(s.truthX);
+  }
+  const enter = run.thresholdsMm.enter, exit = run.thresholdsMm.exit;
+  pinchVals.push(enter, exit, exit + 10, 0);
+  const pMin = Math.min.apply(Math, pinchVals) - 3;
+  const pMax = Math.max.apply(Math, pinchVals) + 3;
+  const py = v => padT + topH - (v - pMin) / (pMax - pMin) * topH;
+  const xMin = Math.min.apply(Math, xVals) - 2;
+  const xMax = Math.max.apply(Math, xVals) + 2;
+  const bot0 = padT + topH + gapH;
+  const xy = v => bot0 + botH - (v - xMin) / (xMax - xMin) * botH;
+
+  const path = (getV, yFn) => {
+    let d = "", pen = false;
+    for (let i = 0; i < n; i++) {
+      const v = getV(samples[i]);
+      if (!Number.isFinite(v)) { pen = false; continue; }
+      d += (pen ? " L" : "M") + xs(i).toFixed(1) + " " + yFn(v).toFixed(1);
+      pen = true;
+    }
+    return d;
+  };
+
+  let s = "";
+  /* Hysteresis bands on the pinch channel: green floor below enter,
+     amber hysteresis band enter..exit, hover ceiling at exit + 10 mm. */
+  s += '<rect x="' + padL + '" y="' + py(exit).toFixed(1) + '" width="' + (W - padL - padR) +
+    '" height="' + (py(enter) - py(exit)).toFixed(1) + '" fill="rgba(245,158,11,0.10)"/>';
+  s += '<rect x="' + padL + '" y="' + py(exit + 10).toFixed(1) + '" width="' + (W - padL - padR) +
+    '" height="' + (py(exit) - py(exit + 10)).toFixed(1) + '" fill="rgba(56,189,248,0.07)"/>';
+  for (const [v, col, lbl] of [[enter, "#10B981", "enter " + enter], [exit, "#F59E0B", "exit " + exit], [exit + 10, "#38BDF8", "hover out " + (exit + 10)]]) {
+    s += '<line x1="' + padL + '" y1="' + py(v).toFixed(1) + '" x2="' + (W - padR) + '" y2="' + py(v).toFixed(1) +
+      '" stroke="' + col + '" stroke-width="1" stroke-dasharray="4 3" opacity="0.8"/>';
+    s += '<text x="' + (padL - 5) + '" y="' + (py(v) + 3).toFixed(1) + '" fill="' + col + '" font-size="8" text-anchor="end">' + lbl + "</text>";
+  }
+  s += '<text x="' + (padL - 5) + '" y="' + (padT + 8) + '" fill="#94A3B8" font-size="8" text-anchor="end">' + pMax.toFixed(0) + "</text>";
+  s += '<text x="' + (padL - 5) + '" y="' + (padT + topH) + '" fill="#94A3B8" font-size="8" text-anchor="end">' + pMin.toFixed(0) + "</text>";
+  s += '<path d="' + path(s2 => s2.rawPinch, py) + '" fill="none" stroke="#94A3B8" stroke-width="1" opacity="0.55"/>';
+  s += '<path d="' + path(s2 => s2.truthPinch, py) + '" fill="none" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="2 3" opacity="0.7"/>';
+  s += '<path d="' + path(s2 => s2.filtPinch, py) + '" fill="none" stroke="#38BDF8" stroke-width="1.8"/>';
+  for (const tr of run.transitions) {
+    const v = samples[tr.i] && Number.isFinite(samples[tr.i].filtPinch) ? samples[tr.i].filtPinch : enter;
+    const col = LAB_STATE_COLORS[tr.to] || "#94A3B8";
+    const lbl = "frame " + tr.i + ": " + tr.from + " to " + tr.to;
+    s += '<circle class="lab-marker" cx="' + xs(tr.i).toFixed(1) + '" cy="' + py(v).toFixed(1) + '" r="4" fill="' + col +
+      '" tabindex="0" role="img" aria-label="' + escapeHtml(lbl) + '"><title>' + escapeHtml(lbl) + "</title></circle>";
+  }
+  /* Lower panel: position channel, truth dashed, raw muted, filtered cyan. */
+  s += '<text x="' + (padL - 5) + '" y="' + (bot0 + 8) + '" fill="#94A3B8" font-size="8" text-anchor="end">' + xMax.toFixed(0) + "</text>";
+  s += '<text x="' + (padL - 5) + '" y="' + (bot0 + botH) + '" fill="#94A3B8" font-size="8" text-anchor="end">' + xMin.toFixed(0) + "</text>";
+  s += '<text x="' + (W - padR) + '" y="' + (bot0 + 9) + '" fill="#94A3B8" font-size="8" text-anchor="end">position (mm)</text>';
+  s += '<path d="' + path(s2 => s2.truthX, xy) + '" fill="none" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="2 3" opacity="0.7"/>';
+  s += '<path d="' + path(s2 => s2.rawX, xy) + '" fill="none" stroke="#94A3B8" stroke-width="1" opacity="0.5"/>';
+  s += '<path d="' + path(s2 => s2.filtX, xy) + '" fill="none" stroke="#38BDF8" stroke-width="1.8"/>';
+  for (const sec of [0, 1, 2]) {
+    const i = Math.min(n - 1, Math.round(sec * 1000 / FilterLab.DT_MS));
+    s += '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 2) + '" fill="#94A3B8" font-size="8" text-anchor="middle">' + sec + " s</text>";
+  }
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Pinch distance trace with hysteresis bands and position channel">' + s + "</svg>";
+}
+
+function renderLabParetoChart() {
+  const box = el("lab-pareto-chart");
+  if (!box || !lab.comparison) return;
+  const rows = lab.comparison.rows;
+  const W = 560, padL = 46, padR = 16, padT = 14, ph = 140;
+  const H = padT + ph + 26;
+  const maxX = Math.max.apply(Math, rows.map(r => r.metrics.jitterRmsMm)) * 1.15 || 1;
+  const maxY = Math.max(1, Math.max.apply(Math, rows.map(r => r.metrics.lagMs)) * 1.15);
+  const px = j => padL + (W - padL - padR) * j / maxX;
+  const py = l => padT + ph - l / maxY * ph;
+  const frontier = FilterLab.paretoFrontierIds(rows);
+  const pts = rows.map(r => ({
+    id: r.profile.id, label: r.profile.label,
+    j: r.metrics.jitterRmsMm, l: r.metrics.lagMs,
+    front: frontier.includes(r.profile.id), sel: r.profile.id === lab.state.profile
+  }));
+  let s = "";
+  s += '<line x1="' + padL + '" y1="' + (padT + ph) + '" x2="' + (W - padR) + '" y2="' + (padT + ph) + '" stroke="rgba(255,255,255,0.18)"/>';
+  s += '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT + ph) + '" stroke="rgba(255,255,255,0.18)"/>';
+  s += '<text x="' + (W - padR) + '" y="' + (H - 4) + '" fill="#94A3B8" font-size="9" text-anchor="end">jitter RMS (mm)</text>';
+  s += '<text x="' + padL + '" y="' + (padT - 4) + '" fill="#94A3B8" font-size="9">effective lag (ms)</text>';
+  s += '<text x="' + (padL - 5) + '" y="' + (padT + ph + 12) + '" fill="#94A3B8" font-size="8" text-anchor="end">0</text>';
+  s += '<text x="' + (padL - 5) + '" y="' + (padT + 4) + '" fill="#94A3B8" font-size="8" text-anchor="end">' + maxY.toFixed(0) + "</text>";
+  s += '<text x="' + (W - padR) + '" y="' + (padT + ph + 12) + '" fill="#94A3B8" font-size="8" text-anchor="end">' + maxX.toFixed(2) + "</text>";
+  const fpts = pts.filter(p => p.front).sort((a, b) => a.j - b.j);
+  if (fpts.length > 1) {
+    s += '<path d="M' + fpts.map(p => px(p.j).toFixed(1) + " " + py(p.l).toFixed(1)).join(" L") +
+      '" fill="none" stroke="#38BDF8" stroke-width="1.4" opacity="0.55"/>';
+  }
+  for (const p of pts) {
+    const col = p.sel ? "#A855F7" : p.front ? "#38BDF8" : "#64748B";
+    const lbl = p.label + ": jitter " + p.j.toFixed(3) + " mm, lag " + p.l.toFixed(1) + " ms" +
+      (p.front ? ", Pareto optimal" : "") + (p.sel ? ", selected" : "");
+    s += '<circle cx="' + px(p.j).toFixed(1) + '" cy="' + py(p.l).toFixed(1) + '" r="' + (p.sel ? 8 : 6) +
+      '" fill="' + col + '" stroke="' + (p.sel ? "#fff" : "rgba(11,16,32,0.8)") + '" stroke-width="1.5" tabindex="0" role="img" aria-label="' +
+      escapeHtml(lbl) + '"><title>' + escapeHtml(lbl) + "</title></circle>";
+  }
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Jitter versus lag Pareto frontier">' + s + "</svg>";
+}
+
+function renderLabSweepChart() {
+  const box = el("lab-sweep-chart");
+  if (!box || typeof FilterLab === "undefined") return;
+  const sweep = FilterLab.sweepShoulderMoment({ armSteps: 13, elbowSteps: 13 });
+  setText("lab-sweep-stats",
+    (sweep.armSteps * sweep.elbowSteps) + " postures: min " + sweep.minNm.toFixed(2) + " N.m, max " +
+    sweep.maxNm.toFixed(2) + " N.m at arm " + sweep.maxAt.armDeg + " deg, elbow " + sweep.maxAt.elbowDeg +
+    " deg. The elbow term peaks at " + sweep.peakElbowDeg + " deg because the forearm lever shortens past it.");
+  const W = 560, padL = 40, padR = 12, padT = 10, ph = 148;
+  const H = padT + ph + 24;
+  const cw = (W - padL - padR) / sweep.armSteps;
+  const ch = ph / sweep.elbowSteps;
+  const span = Math.max(1e-9, sweep.maxNm - sweep.minNm);
+  let s = "";
+  for (let i = 0; i < sweep.armSteps; i++) {
+    for (let j = 0; j < sweep.elbowSteps; j++) {
+      const v = sweep.grid[i][j];
+      const t = (v - sweep.minNm) / span;
+      const fill = "hsl(" + Math.round(190 - 160 * t) + ",78%," + Math.round(40 + 10 * t) + "%)";
+      s += '<rect x="' + (padL + i * cw).toFixed(1) + '" y="' + (padT + ph - (j + 1) * ch).toFixed(1) +
+        '" width="' + (cw - 1).toFixed(1) + '" height="' + (ch - 1).toFixed(1) + '" fill="' + fill + '" rx="2"/>';
+    }
+  }
+  const armI = sweep.armDeg.indexOf(sweep.armDeg.reduce((a, b) => Math.abs(b - lab.state.armDeg) < Math.abs(a - lab.state.armDeg) ? b : a));
+  const elbI = sweep.elbowDeg.indexOf(sweep.elbowDeg.reduce((a, b) => Math.abs(b - lab.state.elbowDeg) < Math.abs(a - lab.state.elbowDeg) ? b : a));
+  if (armI >= 0 && elbI >= 0) {
+    const cx = padL + armI * cw + cw / 2, cy = padT + ph - (elbI + 0.5) * ch;
+    const lbl = "arm " + lab.state.armDeg + " deg, elbow " + lab.state.elbowDeg + " deg";
+    s += '<rect x="' + (padL + armI * cw).toFixed(1) + '" y="' + (padT + ph - (elbI + 1) * ch).toFixed(1) +
+      '" width="' + (cw - 1).toFixed(1) + '" height="' + (ch - 1).toFixed(1) + '" fill="none" stroke="#fff" stroke-width="1.5" rx="2"/>';
+    s += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="5" fill="none" stroke="#fff" stroke-width="2" tabindex="0" role="img" aria-label="' +
+      escapeHtml(lbl) + '"><title>' + escapeHtml(lbl) + "</title></circle>";
+  }
+  s += '<text x="' + (W - padR) + '" y="' + (H - 4) + '" fill="#94A3B8" font-size="9" text-anchor="end">arm abduction 0-90 deg</text>';
+  s += '<text x="' + padL + '" y="' + (padT - 2) + '" fill="#94A3B8" font-size="9">elbow 0-120 deg (N.m)</text>';
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Shoulder moment sweep heatmap">' + s + "</svg>";
+}
+
+function labExport(kind) {
+  if (!lab.available || typeof FilterLab === "undefined") return;
+  let text, name, mime;
+  if (kind === "csv") { text = FilterLab.exportCsv(lab.state); name = "spatial-hand-lab-comparison.csv"; mime = "text/csv"; }
+  else if (kind === "md") { text = FilterLab.exportMarkdown(lab.state); name = "spatial-hand-lab-report.md"; mime = "text/markdown"; }
+  else { text = FilterLab.exportJson(lab.state); name = "spatial-hand-lab-report.json"; mime = "application/json"; }
+  const ok = downloadText(name, text, mime);
+  toast(ok ? name + " exported" : name + " export unavailable");
+  SFX.click();
+}
+
+function copyLabLink() {
+  if (!lab.available || typeof FilterLab === "undefined") return;
+  const hash = FilterLab.encodeBookmarkHash(lab.state);
+  const base = typeof location !== "undefined" && location.href ? location.href.split("#")[0] : "";
+  const url = base + hash;
+  const field = el("lab-share-link");
+  if (field) field.value = url;
+  if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+    navigator.clipboard.writeText(url).then(
+      () => toast("Bookmark link copied"),
+      () => toast("Bookmark link shown (clipboard unavailable)")
+    );
+  } else {
+    toast("Bookmark link shown (clipboard unavailable)");
+  }
+  SFX.click();
+}
+
+function labVerifyIntegrity() {
+  if (!lab.available || typeof FilterLab === "undefined") return;
+  const res = FilterLab.verifyDigest(lab.state, lab.digestHex);
+  const node = el("lab-verify-result");
+  if (node) {
+    node.textContent = res.ok
+      ? "INTEGRITY VERIFIED: the stamped digest matches a fresh recomputation of the canonical payload."
+      : "INTEGRITY FAILED: stamped digest does not match a fresh recomputation.";
+    node.className = "fine-print " + (res.ok ? "ok" : "bad");
+  }
+  toast(res.ok ? "Lab export integrity verified" : "Lab export integrity check failed");
+  SFX.click();
+}
+
+function labTamperDemo() {
+  if (!lab.available || typeof FilterLab === "undefined") return;
+  const json = FilterLab.exportJson(lab.state);
+  const mutated = json.replace(/"jitterRmsMm":\s*([0-9.]+)/, (m, num) => '"jitterRmsMm": ' + (parseFloat(num) + 0.5));
+  const tamper = FilterLab.verifyExportIntegrity(mutated);
+  const intact = FilterLab.verifyExportIntegrity(json);
+  const node = el("lab-verify-result");
+  if (node) {
+    if (!tamper.ok && intact.ok) {
+      node.textContent = "TAMPER DETECTED. Tamper demo passed: expected " + tamper.expected.slice(0, 20) +
+        "..., presented " + (tamper.presented || "(none)").slice(0, 20) + "...";
+      node.className = "fine-print ok";
+    } else {
+      node.textContent = "Tamper demo inconclusive: the edited export still verifies.";
+      node.className = "fine-print bad";
+    }
+  }
+  SFX.click();
+}
+
+function labRunSelfTests() {
+  if (!lab.available || typeof FilterLab === "undefined") return;
+  const results = FilterLab.runSelfTests();
+  const passed = results.filter(r => r.passed).length;
+  setText("lab-selftest-count", passed + "/" + results.length + " checks pass");
+  const list = el("lab-selftest-list");
+  if (list) {
+    list.innerHTML = results.map(r =>
+      '<li class="' + (r.passed ? "pass" : "fail") + '"><span class="st-mark">' + (r.passed ? "✓" : "✗") +
+      "</span>" + escapeHtml(r.name) + ' <span class="st-detail">' + escapeHtml(r.detail) + "</span></li>"
+    ).join("");
+  }
+  toast("Lab self-tests: " + passed + "/" + results.length + " pass");
+  SFX.click();
+}
+
 // ---------- Toast ----------
 let toastTimer = null;
 function toast(msg) {
@@ -1428,6 +1862,7 @@ function boot() {
   booted = true;
   initDOM();
   initRenderer();
+  initLab();
 }
 
 const SpatialHandApp = {
@@ -1443,7 +1878,9 @@ const SpatialHandApp = {
   startWebcamHand, stopWebcamHand, sampleWebcam,
   xrPoseToDesk, updateXRSupport, requestXRSession, enterXR, onXRSessionEnd,
   processXRHandFrame, pulseXRHandHaptics, setXRButton,
-  computeHandJointsForPreset, runGestureDemo, playTone, SFX, toast, ensureAudio
+  computeHandJointsForPreset, runGestureDemo, playTone, SFX, toast, ensureAudio,
+  lab, initLab, syncLabControls, recomputeLab, applyLabHash, applyLabProfileToRig,
+  labExport, copyLabLink, labVerifyIntegrity, labTamperDemo, labRunSelfTests, escapeHtml
 };
 if (typeof module === "object" && module.exports) module.exports = SpatialHandApp;
 if (typeof globalThis !== "undefined") globalThis.SpatialHandApp = SpatialHandApp;

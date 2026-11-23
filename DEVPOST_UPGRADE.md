@@ -14,16 +14,21 @@ Every frame samples the rig or a live `XRHand` stream, computes thumb-to-index t
 
 Two export buttons produce a JSON scene manifest and a CSV of recorded frames. A posture comparison button runs a 6 s animation that recomputes two fixed shoulder-moment values. A camera centroid experiment is available only from the manual-control preset, with explicit permission and cleanup on hide, unload and failure.
 
+A new filter, pinch-hysteresis and biomechanics lab sits below the workspace. It replays four deterministic synthetic 90 Hz trajectories through five filter profiles and the real pinch state machine, and reports hold-window jitter, effective lag, 90% step settle lag, false pinch transitions and recovery frames after tracking dropouts. Charts draw the pinch trace with hysteresis bands, a jitter-vs-lag Pareto frontier and a posture-moment heatmap swept over arm 0-90 deg and elbow 0-120 deg. One button copies a 1-Euro profile's parameters into the live rig. Every export is stamped with a pure-JS SHA-256 digest over a canonical payload, identical on the page, in the JSON, in the CSV header and in the Markdown footer, and an interactive verify/tamper demo shows the integrity check catching a mutated file. A `#shs=` bookmark hash round-trips the whole lab state, and a fail-closed codec rejects malformed hashes. Twenty deterministic self-tests run in the page, including SHA-256 known-answer vectors, hysteresis chatter elimination, rigid-rotation distance invariance and moment monotonicity.
+
+All lab data is synthetic and deterministic; the shoulder model is an illustrative quasi-static two-segment calculation, not EMG, clinical or human-subject measurement, and the SHA-256 is an unkeyed integrity digest, not a signature.
+
 ## How we built it
 
-The app loads four local scripts with no bundler, no package install and no network request. `index.html` and `styles.css` use system font stacks. The JavaScript files split into:
+The app loads five local scripts with no bundler, no package install and no network request. `index.html` and `styles.css` use system font stacks. The JavaScript files split into:
 
 - `js/xr-hand-kinematics.js`: the 25 `XRHand` joint names and parent map, base rig coordinates, 1-Euro filter and filter bank, pinch FSM, palm basis, gesture rules and the quasi-static shoulder moment.
 - `js/hand-telemetry.js`: a robust sample gate, joint velocity and acceleration, high-pass RMS, path efficiency, comfort cone geometry, a session report and CSV export.
+- `js/filter-lab.js`: the lab module: seeded trajectory generators, filter profiles, metrics, the posture sweep, pure-JS UTF-8 SHA-256, the canonical-payload exporters, the `#shs=` codec and the self-test table. If it is absent the lab section hides and the app is unchanged.
 - `js/spatial-renderer.js`: the Canvas 2D pinhole projection and all scene drawing.
-- `js/app.js`: DOM wiring, the frame loop, Web Audio cues, gesture choreography, the camera experiment, the WebXR bridge and both exporters.
+- `js/app.js`: DOM wiring, the frame loop, Web Audio cues, gesture choreography, the camera experiment, the WebXR bridge, both exporters and the lab UI.
 
-The kinematics and telemetry modules also export CommonJS so the Node test suites load exactly the same source as the browser. The DOM suite runs all four scripts unchanged inside one `vm` context with DOM, Canvas and WebXR doubles, which reproduces classic script tag scoping. A second harness uses actual DOM events and bubbling for the Space-key interaction regressions. Pinned test dependencies are installed with `npm ci --ignore-scripts`.
+The kinematics, telemetry and lab modules also export CommonJS so the Node test suites load exactly the same source as the browser. The DOM suite runs all five scripts unchanged inside one `vm` context with DOM, Canvas and WebXR doubles, which reproduces classic script tag scoping. A second harness uses actual DOM events and bubbling for the Space-key interaction regressions. Pinned test dependencies are installed with `npm ci --ignore-scripts`.
 
 **Filter.** `alpha(cutoff, dt) = 1 / (1 + (1 / (2 * pi * cutoff)) / dt)`. The derivative uses consecutive raw samples rather than filtered ones, and the adaptive cutoff is `minCutoff + beta * |dxHat|`. Nonfinite samples, repeated timestamps and backward timestamps do not mutate state. Invalid configuration raises `RangeError`.
 
@@ -67,7 +72,7 @@ python3 -m venv .venv
 python3 -m http.server 8000
 ```
 
-`npm run check` runs `node --check` on every JavaScript file. `npm test` runs five Node suites covering kinematics, telemetry, DOM/UI wiring, WebXR and hygiene. The pytest file runs `npm test` as a second entry point, and CI runs the Node, Python and benchmark commands on Ubuntu. The hygiene scanner includes every git-tracked and untracked non-ignored project file, including its own tests, and checks terms, dashes, email, formatted phone numbers, secret-shaped values and structured media metadata. Installed packages are excluded.
+`npm run check` runs `node --check` on every JavaScript file. `npm test` runs six Node suites covering kinematics, telemetry, the filter lab, DOM/UI wiring, WebXR and hygiene. The pytest file runs `npm test` as a second entry point, and CI runs the Node, Python and benchmark commands on Ubuntu. The hygiene scanner includes every git-tracked and untracked non-ignored project file, including its own tests, and checks terms, dashes, email, formatted phone numbers, secret-shaped values and structured media metadata. Installed packages are excluded.
 
 Exact reproduced values:
 
@@ -99,16 +104,21 @@ See `DEVPOST_UPGRADE.md` for the write-up structure, `README.md` for the full te
 
 Run the input pipeline on a WebXR-capable headset with `local-floor` and `hand-tracking`, then measure task accuracy, pinch false starts, completion time and reported comfort with appropriate consent. Add a per-viewer reference-space transform, a stereo renderer and a tested scene import format. Replace the fixed colour centroid experiment with a hand landmark detector and report accuracy across lighting conditions. Record device traces to compare 1-Euro parameter choices against measured jitter, and publish the resulting numbers rather than model-derived estimates.
 
-## November 16 local verification
+## Local verification
 
-122 Node tests passed, 0 failed, 0 skipped, 0 cancelled. The Python wrapper
-passed 1 case and reruns the same 122 Node tests. The existing synthetic
-benchmark processed 2400 frames and retained 1800 frames.
+396 Node tests passed, 0 failed, 0 skipped, 0 cancelled (`npm test`, six
+suites). The Python wrapper passed 1 case and reruns the same 396 Node
+tests. The synthetic benchmark processed 2400 frames and retained 1800
+frames. The honesty/defect audit reported 0 violations and a byte-level
+grep found 0 em/en dashes. A headless Chromium pass at 1440x900 and
+390x844 exercised the lab with real pointer input: 0 console errors,
+0 page exceptions, 0 external requests, 0 horizontal overflow, 20/20
+in-page self-test checks, and a `#shs=` reload restored all six state
+fields.
 
 `npm test`, `npm run check`, `npm run benchmark` and the Python pytest wrapper
 are the existing verification entry points. The benchmark uses DOM, Canvas
 and device doubles; it is not a headset performance measurement.
 
 Verification environment. Node v24.16.0 and Python 3.9.6, with pytest 8.4.2
-for Python test files where present. No browser or physical hardware session
-was run.
+for Python test files where present. No physical hardware session was run.

@@ -12,10 +12,10 @@ const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 const css = fs.readFileSync(path.join(ROOT, "styles.css"), "utf8");
 
 /* ---------- Static markup hygiene ---------- */
-test("index.html loads the four local scripts in dependency order", () => {
+test("index.html loads the five local scripts in dependency order", () => {
   const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
   assert.deepEqual(srcs, [
-    "js/hand-telemetry.js", "js/xr-hand-kinematics.js",
+    "js/hand-telemetry.js", "js/xr-hand-kinematics.js", "js/filter-lab.js",
     "js/spatial-renderer.js", "js/app.js"
   ]);
   for (const src of srcs) assert.ok(fs.existsSync(path.join(ROOT, src)), src);

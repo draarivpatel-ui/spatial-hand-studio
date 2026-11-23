@@ -10,9 +10,11 @@ const { listProjectFiles, findings, FORBIDDEN, PII, DASHES, mp4Metadata } = requ
 const TEXT_FILES = [
   "index.html", "styles.css", "README.md", "DEVPOST_UPGRADE.md",
   "package.json", "requirements-dev.txt", ".gitignore",
-  "js/hand-telemetry.js", "js/xr-hand-kinematics.js", "js/spatial-renderer.js", "js/app.js",
+  "js/hand-telemetry.js", "js/xr-hand-kinematics.js", "js/filter-lab.js",
+  "js/spatial-renderer.js", "js/app.js",
   "tests/kinematics.test.cjs", "tests/telemetry.test.cjs", "tests/dom-ui.test.cjs",
   "tests/webxr.test.cjs", "tests/hygiene.test.cjs", "tests/hardening.test.cjs",
+  "tests/filter-lab.test.cjs", "tests/browser-audit.mjs",
   "tests/helpers/dom-harness.cjs", "tests/helpers/browser-harness.cjs",
   ".github/workflows/tests.yml"
 ];

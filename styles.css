@@ -393,3 +393,89 @@ button:focus-visible,.switch:focus-visible,input:focus-visible{outline:2px solid
 
 [hidden] { display: none !important; }
 ::selection { background: rgba(56, 189, 248, 0.3); color: var(--text); }
+
+/* ---------- Filter and biomechanics lab ---------- */
+.lab{
+  margin:0 14px 22px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03));
+  border:1px solid var(--panel-border);border-radius:var(--radius);
+  overflow:hidden;backdrop-filter:blur(14px) saturate(1.15);
+}
+.lab-head{
+  padding:12px 14px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--panel-border);background:rgba(255,255,255,0.03);
+}
+.lab-head h3{font-size:12px;font-weight:700}
+.lab-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:12px;padding:14px}
+@media(max-width:1100px){.lab-grid{grid-template-columns:1fr}}
+.lab-card{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:12px;min-width:0;
+}
+.lab-card .section-title{margin-top:14px}
+.lab-card .section-title:first-child{margin-top:0}
+.lab-chips{display:flex;gap:8px;flex-wrap:wrap}
+.lab-chip{
+  padding:7px 11px;border-radius:999px;
+  background:rgba(255,255,255,0.05);border:1px solid var(--glass-border);
+  font-size:11.5px;font-weight:600;color:var(--text-muted);transition:all .18s;
+}
+.lab-chip:hover{border-color:var(--panel-border-strong);color:var(--text)}
+.lab-chip.active{
+  background:linear-gradient(135deg,rgba(56,189,248,0.18),rgba(168,85,247,0.18));
+  border-color:rgba(56,189,248,0.35);color:var(--text);
+}
+.lab-table-wrap{overflow-x:auto;margin-top:6px}
+.lab-table{width:100%;border-collapse:collapse;font-size:11px}
+.lab-table th{
+  font-size:10.5px;font-weight:700;color:var(--text-muted);text-align:left;
+  padding:5px 6px;border-bottom:1px solid var(--panel-border);white-space:nowrap;
+}
+.lab-table td{
+  padding:6px;border-bottom:1px solid rgba(255,255,255,0.05);
+  font-family:ui-monospace,monospace;font-size:11px;white-space:nowrap;
+}
+.lab-table tr.sel td{background:rgba(56,189,248,0.07)}
+.lab-pick{
+  background:none;border:none;color:var(--cyan);font-weight:700;font-size:11px;
+  text-align:left;padding:0;font-family:inherit;
+}
+.lab-pick.on{color:var(--violet)}
+.lab-na{font-size:10.5px;color:var(--text-dim);font-family:inherit}
+.lab-chart{
+  margin-top:8px;padding:6px;
+  background:rgba(11,16,32,0.6);border:1px solid var(--panel-border);border-radius:10px;
+}
+.lab-chart svg{display:block;height:auto}
+.lab-chart [tabindex]:focus{outline:none}
+.lab-chart [tabindex]:focus-visible{stroke:#fff;stroke-width:2}
+.lab-digest{
+  display:flex;flex-direction:column;gap:6px;
+  padding:9px 10px;border-radius:10px;margin-bottom:10px;
+  background:rgba(11,16,32,0.6);border:1px solid var(--panel-border);
+}
+.lab-digest span{font-size:10.5px;font-weight:700;color:var(--text-muted)}
+.lab-digest code{
+  font-family:ui-monospace,'SF Mono',monospace;font-size:10.5px;color:var(--green);
+  word-break:break-all;line-height:1.5;
+}
+.lab-btn-col{display:grid;gap:8px}
+.lab-btn-row{display:flex;gap:8px;margin-top:8px;align-items:center}
+.lab-btn-row .btn-secondary,.lab-btn-col .btn-secondary{width:auto;flex:1;padding:8px 10px;font-size:11px}
+#lab-share-link{
+  width:100%;margin-top:8px;padding:7px 9px;border-radius:8px;
+  background:rgba(11,16,32,0.6);border:1px solid var(--panel-border);
+  color:var(--text-muted);font-family:ui-monospace,monospace;font-size:10.5px;
+}
+#lab-verify-result.ok{color:var(--green)}
+#lab-verify-result.bad{color:#F87171}
+.selftest-list{list-style:none;margin-top:8px;max-height:240px;overflow:auto;display:grid;gap:4px;padding:0}
+.selftest-list li{
+  font-size:11px;color:var(--text-muted);padding:5px 8px;border-radius:8px;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);
+}
+.st-mark{font-weight:800;margin-right:4px}
+.selftest-list li.pass .st-mark{color:var(--green)}
+.selftest-list li.fail .st-mark{color:#F87171}
+.selftest-list li.fail{color:var(--text)}
+.st-detail{color:var(--text-dim);font-family:ui-monospace,monospace;font-size:10px}

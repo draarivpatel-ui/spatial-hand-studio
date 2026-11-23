@@ -10,6 +10,7 @@ const ROOT = path.join(__dirname, "..", "..");
 const SCRIPTS = [
   "js/hand-telemetry.js",
   "js/xr-hand-kinematics.js",
+  "js/filter-lab.js",
   "js/spatial-renderer.js",
   "js/app.js"
 ];
@@ -144,6 +145,7 @@ function createHarness({ xr = null, mediaDevices = true } = {}) {
       if (sel === "[data-app-toggle]") return selectorLists["[data-app-toggle]"];
       if (sel === "[data-view-mode]") return selectorLists["[data-view-mode]"];
       if (sel === "[data-gesture]") return selectorLists["[data-gesture]"];
+      if (sel === "[data-lab-traj]") return selectorLists["[data-lab-traj]"];
       return [];
     }
   };
@@ -168,6 +170,14 @@ function createHarness({ xr = null, mediaDevices = true } = {}) {
     "kv-state", "kv-fps", "stat-fps", "stat-reduction", "stat-joints", "bench-reduction",
     "tel-frames", "tel-mean", "tel-std", "tel-path", "tel-cone", "tel-false-starts",
     "telemetry-report", "manifest-anchor",
+    "filter-lab-section", "lab-traj-desc", "lab-compare-body",
+    "lab-enter", "lab-exit", "lab-arm", "lab-elbow",
+    "lab-enter-val", "lab-exit-val", "lab-arm-val", "lab-elbow-val",
+    "lab-moment-val", "lab-sweep-chart", "lab-sweep-stats",
+    "lab-trace-chart", "lab-pareto-chart", "lab-digest", "lab-share-link",
+    "btn-lab-apply", "btn-lab-json", "btn-lab-csv", "btn-lab-md",
+    "btn-lab-copy-link", "btn-lab-verify", "btn-lab-tamper",
+    "btn-lab-selftest", "lab-verify-result", "lab-selftest-count", "lab-selftest-list",
     "toast", "bench-progress-bar", "bench-status", "bench-result"
   ];
   ids.forEach(id => register(id, id === "spatial-canvas" ? "canvas" : "div"));
@@ -205,6 +215,11 @@ function createHarness({ xr = null, mediaDevices = true } = {}) {
     }),
     "[data-gesture]": ["pinch", "stretch", "palm-up", "poke", "mouse"].map((v, i) => {
       const b = makeButton("gesture-" + v, "data-gesture", v, "Preset " + (i + 1));
+      if (i === 0) b.classList.add("active");
+      return b;
+    }),
+    "[data-lab-traj]": ["micro-tremor-hover", "step-saccade-grab", "pinch-chatter-boundary", "tracking-dropout-recovery"].map((v, i) => {
+      const b = makeButton("lab-traj-" + v, "data-lab-traj", v, v);
       if (i === 0) b.classList.add("active");
       return b;
     })

@@ -229,6 +229,102 @@
 
 </main>
 
+<section class="lab" id="filter-lab-section">
+  <div class="lab-head">
+    <h3>Filter and biomechanics lab</h3>
+    <span class="mini">Deterministic synthetic data · SHA-256 audited exports</span>
+  </div>
+  <div class="lab-grid">
+
+    <div class="lab-card">
+      <div class="section-title">Trajectory preset</div>
+      <div class="lab-chips" role="group" aria-label="Synthetic trajectory presets">
+        <button class="lab-chip active" data-lab-traj="micro-tremor-hover" aria-pressed="true">Micro-tremor hover</button>
+        <button class="lab-chip" data-lab-traj="step-saccade-grab" aria-pressed="false">Step saccade grab</button>
+        <button class="lab-chip" data-lab-traj="pinch-chatter-boundary" aria-pressed="false">Pinch chatter boundary</button>
+        <button class="lab-chip" data-lab-traj="tracking-dropout-recovery" aria-pressed="false">Tracking dropout recovery</button>
+      </div>
+      <p class="fine-print" id="lab-traj-desc"></p>
+
+      <div class="section-title">Five-filter comparator</div>
+      <div class="lab-table-wrap">
+        <table class="lab-table">
+          <thead><tr>
+            <th>Profile</th><th>Jitter RMS (mm)</th><th>Eff. lag (ms)</th><th>90% settle (ms)</th><th>False pinch</th><th>Recovery (frames)</th><th></th>
+          </tr></thead>
+          <tbody id="lab-compare-body"></tbody>
+        </table>
+      </div>
+
+      <div class="section-title">Filter trace and pinch hysteresis bands</div>
+      <div id="lab-trace-chart" class="lab-chart"></div>
+
+      <div class="section-title">Jitter vs effective lag</div>
+      <div id="lab-pareto-chart" class="lab-chart"></div>
+    </div>
+
+    <div class="lab-card">
+      <div class="section-title">Pinch hysteresis</div>
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>Enter threshold</span><span id="lab-enter-val">20 mm</span></div>
+        <input id="lab-enter" type="range" min="8" max="40" step="0.5" value="20" aria-label="Lab pinch enter threshold in millimetres">
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>Exit threshold</span><span id="lab-exit-val">28 mm</span></div>
+        <input id="lab-exit" type="range" min="10" max="60" step="0.5" value="28" aria-label="Lab pinch exit threshold in millimetres">
+      </div>
+      <button id="btn-lab-apply" class="btn-secondary">Apply selected filter to the live rig</button>
+      <p class="fine-print">1-Euro profiles only. The raw and EMA rows are comparators; the live rig always runs the 1-Euro bank.</p>
+
+      <div class="divider"></div>
+      <div class="section-title">Shoulder moment sweep</div>
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>Upper arm angle</span><span id="lab-arm-val">14 deg</span></div>
+        <input id="lab-arm" type="range" min="0" max="90" step="1" value="14" aria-label="Upper arm abduction in degrees">
+      </div>
+      <div class="ctrl-group">
+        <div class="ctrl-label"><span>Elbow flexion</span><span id="lab-elbow-val">20.4 deg</span></div>
+        <input id="lab-elbow" type="range" min="0" max="120" step="0.2" value="20.4" aria-label="Elbow flexion in degrees">
+      </div>
+      <div class="kv">
+        <div class="kv-label"><b>Modelled moment</b><br><span class="kv-sub">Two-segment quasi-static, 75 kg</span></div>
+        <div id="lab-moment-val" class="kv-value green">waiting</div>
+      </div>
+      <div id="lab-sweep-chart" class="lab-chart"></div>
+      <p class="fine-print" id="lab-sweep-stats"></p>
+    </div>
+
+    <div class="lab-card">
+      <div class="section-title">Audited export</div>
+      <div class="lab-digest">
+        <span>SHA-256 canonical-JSON digest</span>
+        <code id="lab-digest">computing</code>
+      </div>
+      <div class="lab-btn-col">
+        <button id="btn-lab-json" class="btn-secondary">Export lab report (JSON)</button>
+        <button id="btn-lab-csv" class="btn-secondary">Export comparison (CSV)</button>
+        <button id="btn-lab-md" class="btn-secondary">Export lab report (Markdown)</button>
+        <button id="btn-lab-copy-link" class="btn-secondary">Copy #shs= bookmark link</button>
+      </div>
+      <input id="lab-share-link" type="text" readonly value="" aria-label="Bookmark link for the current lab state">
+      <div class="lab-btn-row">
+        <button id="btn-lab-verify" class="btn-secondary">Verify integrity</button>
+        <button id="btn-lab-tamper" class="btn-secondary">Tamper demo</button>
+      </div>
+      <p id="lab-verify-result" class="fine-print"></p>
+
+      <div class="divider"></div>
+      <div class="lab-btn-row">
+        <button id="btn-lab-selftest" class="btn-secondary">Run lab self-tests</button>
+        <span id="lab-selftest-count" class="pill"></span>
+      </div>
+      <ul id="lab-selftest-list" class="selftest-list"></ul>
+      <p class="fine-print">Every lab value is computed locally from seeded synthetic data. The posture sweep is a deterministic quasi-static model: no EMG, clinical or human-subject measurement.</p>
+    </div>
+
+  </div>
+</section>
+
 <footer class="footer">
   SpatialHand Studio · Canvas 2D renderer · WebXR hand input bridge when supported · MIT licensed · All values are computed locally
 </footer>
@@ -237,6 +333,7 @@
 
 <script src="js/hand-telemetry.js"></script>
 <script src="js/xr-hand-kinematics.js"></script>
+<script src="js/filter-lab.js"></script>
 <script src="js/spatial-renderer.js"></script>
 <script src="js/app.js"></script>
 </body>
