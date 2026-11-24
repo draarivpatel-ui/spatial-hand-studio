@@ -542,8 +542,18 @@
   function utf8Bytes(str) {
     const out = [];
     for (let i = 0; i < str.length; i++) {
-      let cp = str.codePointAt(i);
-      if (cp > 0xffff) i++;
+      let cp = str.charCodeAt(i);
+      if (cp >= 0xd800 && cp <= 0xdbff) {
+        const next = i + 1 < str.length ? str.charCodeAt(i + 1) : 0;
+        if (next >= 0xdc00 && next <= 0xdfff) {
+          cp = 0x10000 + ((cp - 0xd800) << 10) + (next - 0xdc00);
+          i++;
+        } else {
+          cp = 0xfffd;
+        }
+      } else if (cp >= 0xdc00 && cp <= 0xdfff) {
+        cp = 0xfffd;
+      }
       if (cp < 0x80) out.push(cp);
       else if (cp < 0x800) out.push(0xc0 | (cp >> 6), 0x80 | (cp & 63));
       else if (cp < 0x10000) out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));

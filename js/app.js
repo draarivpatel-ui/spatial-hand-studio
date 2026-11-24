@@ -1679,7 +1679,7 @@ function renderLabTraceChart() {
     const i = Math.min(n - 1, Math.round(sec * 1000 / FilterLab.DT_MS));
     s += '<text x="' + xs(i).toFixed(1) + '" y="' + (H - 2) + '" fill="#94A3B8" font-size="8" text-anchor="middle">' + sec + " s</text>";
   }
-  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Pinch distance trace with hysteresis bands and position channel">' + s + "</svg>";
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="group" aria-label="Pinch distance trace with hysteresis bands and position channel">' + s + "</svg>";
 }
 
 function renderLabParetoChart() {
@@ -1719,7 +1719,7 @@ function renderLabParetoChart() {
       '" fill="' + col + '" stroke="' + (p.sel ? "#fff" : "rgba(11,16,32,0.8)") + '" stroke-width="1.5" tabindex="0" role="img" aria-label="' +
       escapeHtml(lbl) + '"><title>' + escapeHtml(lbl) + "</title></circle>";
   }
-  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Jitter versus lag Pareto frontier">' + s + "</svg>";
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="group" aria-label="Jitter versus lag Pareto frontier">' + s + "</svg>";
 }
 
 function renderLabSweepChart() {
@@ -1757,7 +1757,7 @@ function renderLabSweepChart() {
   }
   s += '<text x="' + (W - padR) + '" y="' + (H - 4) + '" fill="#94A3B8" font-size="9" text-anchor="end">arm abduction 0-90 deg</text>';
   s += '<text x="' + padL + '" y="' + (padT - 2) + '" fill="#94A3B8" font-size="9">elbow 0-120 deg (N.m)</text>';
-  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Shoulder moment sweep heatmap">' + s + "</svg>";
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="group" aria-label="Shoulder moment sweep heatmap">' + s + "</svg>";
 }
 
 function labExport(kind) {
