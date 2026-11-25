@@ -529,3 +529,39 @@ test("resetScene also returns the hand yaw to its default", () => {
   h.app.resetScene();
   assert.equal(h.app.state.handYaw, 0);
 });
+
+test("print output is a deliberate light static layout", () => {
+  const fs = require("node:fs");
+  const css = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+  assert.match(css, /@media print/);
+  assert.match(css, /@page \{ size: letter portrait/);
+  assert.match(css, /--panel:#ffffff/);
+  assert.match(css, /\.lab-table-wrap\{overflow:visible\}/);
+  assert.match(css, /button,input,\.switch\{display:none!important\}/);
+});
+
+test("the page carries an inline favicon so no favicon request can 404", () => {
+  const fs = require("node:fs");
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(html, /<link rel="icon" href="data:image\/svg\+xml/);
+  assert.ok(!html.includes('href="favicon.ico"'));
+});
+
+test("text-bearing gradient controls use darkened stops and the hero avoids transparent gradient text", () => {
+  const fs = require("node:fs");
+  const css = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+  assert.match(css, /\.hero h2 em\{font-style:normal;color:var\(--cyan\)\}/);
+  assert.ok(!/hero h2 em[^}]*text-fill-color/.test(css));
+  for (const sel of [".brand-mark", ".btn-xr", ".btn-primary", ".btn-sm.on", ".gesture-chip.active i"]) {
+    assert.ok(css.includes(sel), sel);
+  }
+  assert.ok((css.match(/#0E7490,#7E22CE/g) || []).length >= 5);
+});
+
+test("slider and switch hit targets meet the 24 px minimum", () => {
+  const fs = require("node:fs");
+  const css = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+  assert.match(css, /input\[type=range\]\{\s*width:100%;height:24px/);
+  assert.match(css, /width:44px;height:24px;border-radius:999px/);
+  assert.match(css, /\.switch\.on::after\{transform:translateX\(20px\)\}/);
+});
