@@ -740,8 +740,13 @@
      cell, so a leading apostrophe marks it as literal text. */
   function csvCell(v) {
     if (v === undefined || v === null || (typeof v === "number" && !Number.isFinite(v))) return "";
+    if (typeof v === "number") return String(v);
     let s = String(v);
-    if (typeof v === "string" && /^[\s=+\-@\x00-\x1f\x7f-\x9f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufe00-\ufe0f]/.test(s)) s = "'" + s;
+    if (typeof v === "string") {
+      const lead = (s.match(/^[\s\p{Cc}\p{Cf}\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufe00-\ufe0f\ufeff]*/u) || [""])[0];
+      const rest = s.slice(lead.length);
+      if (lead.length > 0 || /^[=+\-@]/.test(rest)) s = "'" + s;
+    }
     return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
