@@ -115,8 +115,8 @@ MIT licensed. See `tests/` for the boundary checks and `DEVPOST_UPGRADE.md` for 
 
 ## Local verification
 
-402 Node tests passed, 0 failed, 0 skipped, 0 cancelled (`npm test`, eight
-suites). The Python wrapper passed 1 case and reruns the same 402 Node
+403 Node tests passed, 0 failed, 0 skipped, 0 cancelled (`npm test`, eight
+suites). The Python wrapper passed 1 case and reruns the same 403 Node
 tests. The synthetic benchmark processed 2400 frames and retained 1800
 frames. The honesty/defect audit (`hark_honesty_and_defect_harness.py
 --audit .`) reported 0 violations across 13 scanned files, and a byte-level

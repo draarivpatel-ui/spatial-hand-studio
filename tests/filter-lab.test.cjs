@@ -916,7 +916,7 @@ test("exportCsv lists five rows under a metric header", () => {
   assert.equal(rows[0].split(",").length, 8);
 });
 test("csvCell prefixes formula-leading cells with an apostrophe", () => {
-  for (const h of ["=CMD()", "+SUM(1:2)", "@x", "-1", " lead", "\ttab", "\x01ctl"]) {
+  for (const h of ["=CMD()", "+SUM(1:2)", "@x", "-1", " lead", "\ttab", "\x01ctl", "\u200b=CMD()", "\u00ad=CMD()", "\u202e=CMD()"]) {
     assert.equal(FL.csvCell(h)[0], "'", h);
   }
 });

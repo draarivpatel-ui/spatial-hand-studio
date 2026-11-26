@@ -261,7 +261,7 @@
     /* Formula injection: spreadsheet apps interpret a leading =, +, -, @ or
        whitespace/control character as a formula or reference. A leading
        apostrophe marks the cell as literal text. Numbers stay numeric. */
-    if (typeof v === "string" && /^[\s=+\-@\x00-\x1f\x7f-\x9f]/.test(s)) s = "'" + s;
+    if (typeof v === "string" && /^[\s=+\-@\x00-\x1f\x7f-\x9f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufe00-\ufe0f]/.test(s)) s = "'" + s;
     return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
   function exportFramesCsv(frames, { source = "unlabelled" } = {}) {

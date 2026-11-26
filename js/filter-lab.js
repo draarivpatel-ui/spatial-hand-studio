@@ -741,7 +741,7 @@
   function csvCell(v) {
     if (v === undefined || v === null || (typeof v === "number" && !Number.isFinite(v))) return "";
     let s = String(v);
-    if (typeof v === "string" && /^[\s=+\-@\x00-\x1f\x7f-\x9f]/.test(s)) s = "'" + s;
+    if (typeof v === "string" && /^[\s=+\-@\x00-\x1f\x7f-\x9f\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufe00-\ufe0f]/.test(s)) s = "'" + s;
     return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 
@@ -1024,7 +1024,7 @@
     {
       id: "csv-formula-escape", name: "CSV cells cannot carry a spreadsheet formula",
       run() {
-        const hostile = ["=CMD()", "+SUM(A1:A9)", "@ref", "  padded", "\ttab", "-1+1"];
+        const hostile = ["=CMD()", "+SUM(A1:A9)", "@ref", "  padded", "\ttab", "-1+1", "\u200b=CMD()", "\u00ad=CMD()", "\u202e=CMD()"];
         const ok = hostile.every(h => csvCell(h)[0] === "'");
         const numeric = csvCell(-12.5) === "-12.5";
         return { passed: ok && numeric, detail: hostile.length + " hostile cells prefixed" };

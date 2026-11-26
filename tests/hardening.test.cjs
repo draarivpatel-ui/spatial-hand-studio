@@ -487,6 +487,14 @@ test("the R shortcut is ignored while an XR session owns the scene", () => {
   assert.equal(h.app.state.handWorldX, 0.9, "R must not reset mid-session");
 });
 
+test("CSV export guards invisible Unicode format characters", () => {
+  for (const hostile of ["\u200b=cmd", "\u200e=cmd", "\u202e=cmd", "\u00ad=cmd", "\ufe0f=cmd"]) {
+    const csv = T.exportFramesCsv([{ t: 1, source: hostile }]);
+    const cell = csv.split("\r\n")[1].split(",")[1];
+    assert.equal(cell[0], "'", JSON.stringify(hostile));
+  }
+});
+
 test("CSV export guards unicode whitespace and control characters", () => {
   const hostiles = [" line-sep", " para-sep", " fig-space", " narrow-nbsp", "　ideographic", " nbsp",
     "\x0bvtab", "\x0cff", "\x01soh", "\x08bs", "\x7fdel", "nel"];

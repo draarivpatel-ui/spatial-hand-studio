@@ -106,8 +106,8 @@ Run the input pipeline on a WebXR-capable headset with `local-floor` and `hand-t
 
 ## Local verification
 
-402 Node tests passed, 0 failed, 0 skipped, 0 cancelled (`npm test`, eight
-suites). The Python wrapper passed 1 case and reruns the same 402 Node
+403 Node tests passed, 0 failed, 0 skipped, 0 cancelled (`npm test`, eight
+suites). The Python wrapper passed 1 case and reruns the same 403 Node
 tests. The synthetic benchmark processed 2400 frames and retained 1800
 frames. The honesty/defect audit reported 0 violations and a byte-level
 grep found 0 em/en dashes. A headless Chromium pass at 1440x900 and
