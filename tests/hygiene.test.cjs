@@ -89,8 +89,10 @@ test("CI workflow runs node and python suites", () => {
   const wf = read(".github/workflows/tests.yml");
   assert.match(wf, /npm test/);
   assert.match(wf, /pytest -q/);
-  assert.match(wf, /setup-node@v4/);
-  assert.match(wf, /setup-python@v5/);
+  assert.match(wf, /actions\/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1/);
+  assert.match(wf, /actions\/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0/);
+  assert.match(wf, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1/);
+  assert.ok(!/uses: [^\s]+@v\d+\s/.test(wf), "workflow must pin actions to commit SHAs");
 });
 
 test("README and DEVPOST_UPGRADE contain the required sections and verified values", () => {

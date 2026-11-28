@@ -1,21 +1,40 @@
 name: Regression tests
-on: [push, pull_request]
-permissions:
-  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.13'
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
-      - run: python -m pip install -r requirements-dev.txt
-      - run: npm ci --ignore-scripts
-      - run: npm run check
-      - run: npm test
-      - run: npm run benchmark
-      - run: env PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider --import-mode=importlib
+      - name: Install Python test dependency
+        run: python -m pip install --require-hashes -r requirements-dev.txt
+      - name: Install Node development dependencies
+        run: npm ci --ignore-scripts
+      - name: Run syntax check
+        run: npm run check
+      - name: Run Node test suite
+        run: npm test
+      - name: Run benchmark check
+        run: npm run benchmark
+      - name: Run pytest wrapper
+        run: env PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider --import-mode=importlib
